@@ -94,7 +94,6 @@ FXC_MAX_BUFFER=5242880            # Max buffer size for streaming (5MB)
 Config File Location
 All tokens, OAuth secrets, and API keys are stored in:
 
-text
 ~/.fauxclaw/config.json
 Permissions are set to 0600 (owner read/write only) because it contains sensitive data.
 
@@ -199,7 +198,7 @@ claudecodeui – Session management patterns
 
 And a lot of staring at binary EventStream dumps at 3:42 AM CST/CDT.
 
-bash
+
 npm install -g fauxclaw && fxc setup && fxc start
 "Fake it till you make it, but today you made it." 🦞
 
