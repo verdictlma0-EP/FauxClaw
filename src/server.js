@@ -112,7 +112,10 @@ async function handleRequest(req, res, config, clientIp, startTime) {
         { id: 'claude-haiku-4-5-20251001', object: 'model', owned_by: 'fauxclaw-kiro' },
         { id: 'claude-opus-4', object: 'model', owned_by: 'fauxclaw-openrouter' },
         { id: 'gpt-4o', object: 'model', owned_by: 'fauxclaw-openrouter' },
-        { id: 'deepseek-r1', object: 'model', owned_by: 'fauxclaw-iflow' }
+        { id: 'deepseek-r1', object: 'model', owned_by: 'fauxclaw-iflow' },
+        { id: 'nvidia/nemotron-3-super-120b-a12b', object: 'model', owned_by: 'fauxclaw-nvidia' },
+        { id: 'groq/llama-3.3-70b-versatile', object: 'model', owned_by: 'fauxclaw-groq' },
+        { id: 'gemini/gemini-2.0-flash', object: 'model', owned_by: 'fauxclaw-gemini' }
       ]
     }));
     return;
