@@ -14,30 +14,32 @@ So you want to hack on Fauxclaw? Awesome. Here's what you need to know.
 ---
 
 ## Project structure
+
+```text
 fauxclaw/
 ├── bin/
-│ └── fxc.js # CLI entry point
+│   └── fxc.js              # CLI entry point
 ├── src/
-│ ├── config.js # ~/.fauxclaw/config.json mgmt
-│ ├── server.js # HTTP server, request routing
-│ ├── session.js # In‑memory session store
-│ ├── circuitbreaker.js # Per‑provider circuit breaker
-│ ├── status.js # Status reporting
-│ ├── providers/
-│ │ ├── index.js # Provider registry & fallback
-│ │ ├── kiro.js # AWS CodeWhisperer (binary stream)
-│ │ ├── openrouter.js # OpenRouter API
-│ │ └── iflow.js # iFlow (HMAC + session)
-│ └── utils/
-│ ├── logger.js # Coloured, level‑based
-│ ├── metrics.js # Request counters & latency
-│ ├── security.js # API key + rate limiting
-│ ├── http.js # node https wrapper
-│ ├── helpers.js # extractText, detectLanguage
-│ ├── streaming.js # AWS EventStream frame parser
-│ └── branding.js # ASCII lobster, status formatting
+│   ├── config.js           # ~/.fauxclaw/config.json mgmt
+│   ├── server.js           # HTTP server, request routing
+│   ├── session.js          # In‑memory session store
+│   ├── circuitbreaker.js   # Per‑provider circuit breaker
+│   ├── status.js           # Status reporting
+│   ├── providers/
+│   │   ├── index.js        # Provider registry & fallback
+│   │   ├── kiro.js         # AWS CodeWhisperer (binary stream)
+│   │   ├── openrouter.js   # OpenRouter API
+│   │   └── iflow.js        # iFlow (HMAC + session)
+│   └── utils/
+│       ├── logger.js       # Coloured, level‑based
+│       ├── metrics.js      # Request counters & latency
+│       ├── security.js     # API key + rate limiting
+│       ├── http.js         # node https wrapper
+│       ├── helpers.js      # extractText, detectLanguage
+│       ├── streaming.js    # AWS EventStream frame parser
+│       └── branding.js     # ASCII lobster, status formatting
 └── scripts/
-└── setup.js # Interactive OAuth / key wizard
+    └── setup.js            # Interactive OAuth / key wizard
 
 
 ## Development workflow
