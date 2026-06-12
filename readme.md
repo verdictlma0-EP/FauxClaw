@@ -180,16 +180,16 @@ What this means for you:
 
 See the full license text for details.
 
-🦞 Credits
+🦞 Credits (Check them out!)
 Fauxclaw stands on the shoulders of reverse‑engineered giants:
 
-free-claude-code – Proxy architecture, model routing
+free-claude-code – Proxy architecture, model routing (https://github.com/Alishahryar1/free-claude-code)
 
-9router – Kiro executor, token refresh
+9router – Kiro executor, token refresh (https://github.com/decolua/9router)
 
-claudecodeui – Session management patterns
+claudecodeui – Session management patterns (https://github.com/siteboon/claudecodeui)
 
-And a lot of staring at binary EventStream dumps at 2 AM.
+And a lot of staring at binary EventStream dumps at 3:42 AM CST/CDT.
 
 🌟 Star History
 Me ;D(I'm the only one who worked on this as of now)
