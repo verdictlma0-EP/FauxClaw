@@ -1,5 +1,5 @@
 # 🦞 FAUXCLAW
-
+```
 > *Real Claude. Fake Bill.*  
 > A free AI proxy for Claude Code that scratches your AI itch without scratching your wallet.
 
