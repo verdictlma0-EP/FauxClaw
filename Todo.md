@@ -2,7 +2,7 @@
 
 ## High Priority (Next Release)
 
-- [ ] **Publish to npm** – disable 2FA temporarily, run `npm publish`, then re-enable.  
+- [Y] **Publish to npm** – disable 2FA temporarily, run `npm publish`, then re-enable.  
 - [ ] **Fix standalone executable** – resolve `pkg` ES module issues (investigate `nexe` or `@yao-pkg/pkg`).  
 - [ ] **Add one-line installer** – `curl -fsSL https://raw.githubusercontent.com/fauxclaw/fauxclaw/main/install.sh | sh` (and PowerShell equivalent).  
 - [ ] **Add demo GIF/screenshot** to README showing `fxc setup` → `fxc start` → Claude Code working.  
