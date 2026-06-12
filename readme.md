@@ -3,7 +3,7 @@
 > *Real Claude. Fake Bill.*  
 > A free AI proxy for Claude Code that scratches your AI itch without scratching your wallet.
 
-Fauxclaw routes Claude Code requests through multiple **free** providers – AWS CodeWhisperer (Kiro), OpenRouter free tier, and iFlow – with automatic failover, token refresh, and zero configuration beyond the initial setup.
+Fauxclaw routes Claude Code requests through multiple **free** providers, AWS CodeWhisperer (Kiro), OpenRouter free tier, and iFlow, with automatic failover, token refresh, and zero configuration beyond the initial setup.
 
 **No credit card. No AWS bill. Just Claude.**
 
