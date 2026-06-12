@@ -1,4 +1,4 @@
-// Groq provider for OpenAI-compatible Chat Completions aswell
+// Groq provider
 import { nodeHttps } from '../utils/http.js';
 import { extractText } from '../utils/helpers.js';
 
