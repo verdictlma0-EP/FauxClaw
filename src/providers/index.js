@@ -1,9 +1,12 @@
-// Provider router with fallback chain because why not
-// Order: Kiro (free Claude) → OpenRouter (free tier) → iFlow (Chinese free, thank you so much!)
+// Provider router with fallback chain.
+// Order: Kiro (free Claude) → OpenRouter → iFlow → NVIDIA → Groq → Gemini
 
 import { kiroChat, kiroGetToken, kiroRefreshToken } from './kiro.js';
 import { openrouterChat } from './openrouter.js';
 import { iflowChat } from './iflow.js';
+import { nvidiaChat } from './nvidia.js';
+import { groqChat } from './groq.js';
+import { geminiChat } from './gemini.js';
 import { CircuitBreaker } from '../circuitbreaker.js';
 import { loadConfig, saveConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -12,7 +15,10 @@ import { updateProviderMetrics } from '../utils/metrics.js';
 const breakers = {
   kiro: new CircuitBreaker('kiro'),
   openrouter: new CircuitBreaker('openrouter'),
-  iflow: new CircuitBreaker('iflow')
+  iflow: new CircuitBreaker('iflow'),
+  nvidia: new CircuitBreaker('nvidia'),
+  groq: new CircuitBreaker('groq'),
+  gemini: new CircuitBreaker('gemini')
 };
 
 export async function routeRequest(config, body, model, sessionId = null, retry = 0) {
@@ -48,6 +54,18 @@ export async function routeRequest(config, body, model, sessionId = null, retry 
         const token = config.iflow?.token;
         if (!token) throw new Error('iFlow token missing');
         result = await cb.call(() => iflowChat(token, body, model));
+      } else if (provider === 'nvidia') {
+        const key = config.nvidia?.apiKey;
+        if (!key) throw new Error('NVIDIA NIM API key missing');
+        result = await cb.call(() => nvidiaChat(key, body, model));
+      } else if (provider === 'groq') {
+        const key = config.groq?.apiKey;
+        if (!key) throw new Error('Groq API key missing');
+        result = await cb.call(() => groqChat(key, body, model));
+      } else if (provider === 'gemini') {
+        const key = config.gemini?.apiKey;
+        if (!key) throw new Error('Gemini API key missing');
+        result = await cb.call(() => geminiChat(key, body, model));
       } else {
         continue;
       }
@@ -75,5 +93,8 @@ export function getAvailableProviders(config) {
   if (config.kiro?.accessToken || config.kiro?.refreshToken) chain.push('kiro');
   if (config.openrouter?.apiKey) chain.push('openrouter');
   if (config.iflow?.token) chain.push('iflow');
+  if (config.nvidia?.apiKey) chain.push('nvidia');
+  if (config.groq?.apiKey) chain.push('groq');
+  if (config.gemini?.apiKey) chain.push('gemini');
   return chain;
 }
