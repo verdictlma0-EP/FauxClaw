@@ -1,4 +1,4 @@
-// Google Gemini provider thing
+// Google Gemini provider 
 import { nodeHttps } from '../utils/http.js';
 import { extractText } from '../utils/helpers.js';
 
