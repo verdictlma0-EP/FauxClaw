@@ -3,7 +3,7 @@
 > *Real Claude. Fake Bill.*  
 > A free AI proxy for Claude Code that scratches your AI itch without scratching your wallet.
 
-Fauxclaw routes Claude Code requests through multiple **free** providers, AWS CodeWhisperer (Kiro), OpenRouter free tier, and iFlow, with automatic failover, token refresh, and zero configuration beyond the initial setup.
+Fauxclaw routes Claude Code requests through multiple **free** providers – AWS CodeWhisperer (Kiro), OpenRouter free tier, and iFlow – with automatic failover, token refresh, and zero configuration beyond the initial setup.
 
 **No credit card. No AWS bill. Just Claude.**
 
@@ -24,7 +24,6 @@ Fauxclaw routes Claude Code requests through multiple **free** providers, AWS Co
 
 ## Quick Start
 
-```
 # Clone the repo
 git clone https://github.com/fauxclaw/fauxclaw
 cd fauxclaw
@@ -39,7 +38,6 @@ fxc setup
 fxc start
 Then point Claude Code (or any Anthropic‑compatible client) to:
 
-bash
 export ANTHROPIC_BASE_URL=http://localhost:8083
 export ANTHROPIC_API_KEY=anything   # or your FXC_API_KEY if you set one
 claude
@@ -55,7 +53,6 @@ Fallback chain: Kiro → OpenRouter → iFlow
 If one provider fails, rate-limits you, or your token expires, Fauxclaw automatically tries the next one. You won't even notice.
 
 Commands
-bash
 fxc setup          # Interactive provider setup (Kiro device auth, API keys)
 fxc start          # Launch the proxy (default command)
 fxc status         # Show token expiry & provider health
@@ -68,7 +65,6 @@ Configuration
 Environment Variables
 Optional – most things are stored in ~/.fauxclaw/config.json after setup.
 
-
 FXC_PORT=8083                     # Port to listen on
 FXC_HOST=127.0.0.1                # Bind address (use 0.0.0.0 for external access)
 FXC_API_KEY=your-secret-here      # Require this in X-Proxy-Key header
@@ -79,12 +75,11 @@ FXC_MAX_BUFFER=5242880            # Max buffer size for streaming (5MB)
 Config File Location
 All tokens, OAuth secrets, and API keys are stored in:
 
-
+text
 ~/.fauxclaw/config.json
 Permissions are set to 0600 (owner read/write only) because it contains sensitive data.
 
 How It Works
-text
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │ Claude Code │────▶│  Fauxclaw   │────▶│   Kiro      │
 │             │     │   Proxy     │     │  (Free)     │
@@ -117,7 +112,7 @@ If a provider fails, the circuit breaker opens for 60 seconds to avoid hammering
 
 Your Claude session continues like nothing happened.
 
-❓ FAQ
+FAQ
 Is this legal?
 Yes. You're using AWS CodeWhisperer's free tier exactly as AWS intended – with your own AWS Builder ID. Fauxclaw is just a translation layer. No AWS ToS violation. No credit card required. No "hacks".
 
@@ -183,16 +178,17 @@ See the full license text for details.
 🦞 Credits (Check them out!)
 Fauxclaw stands on the shoulders of reverse‑engineered giants:
 
-free-claude-code – Proxy architecture, model routing (https://github.com/Alishahryar1/free-claude-code)
+free-claude-code – Proxy architecture, model routing
 
-9router – Kiro executor, token refresh (https://github.com/decolua/9router)
+9router – Kiro executor, token refresh
 
-claudecodeui – Session management patterns (https://github.com/siteboon/claudecodeui)
+claudecodeui – Session management patterns
 
 And a lot of staring at binary EventStream dumps at 3:42 AM CST/CDT.
 
-🌟 Star History
-Me ;D(I'm the only one who worked on this as of now)
+Star History
+Me ;D (I'm the only one who worked on this as of now)
+
 If Fauxclaw saves you money, saves you time, or just makes you smile – star the repo. It helps others find it.
 
 bash
