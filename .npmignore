@@ -1,0 +1,12 @@
+# Tests, docs, local config
+tests/
+docs/
+.fauxclaw/
+.env
+*.log
+
+# Build artifacts (if any)
+dist/
+*.exe
+*.deb
+*.pkg
