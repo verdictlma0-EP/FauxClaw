@@ -9,7 +9,7 @@ Fauxclaw routes Claude Code requests through multiple **free** providers – AWS
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Quick Start](#quick-start)
 - [What You Get](#what-you-get)
