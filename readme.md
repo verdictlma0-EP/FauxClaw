@@ -41,10 +41,9 @@ Fauxclaw routes Claude Code requests through multiple **free** providers – AWS
 
 ### One-liner (install, setup, and start)
 
-```bash
+```
 npm install -g fauxclaw && fxc setup && fxc start
 Or step by step
-bash
 # Install globally
 npm install -g fauxclaw
 
@@ -55,7 +54,6 @@ fxc setup
 fxc start
 Then point Claude Code (or any Anthropic‑compatible client) to:
 
-bash
 export ANTHROPIC_BASE_URL=http://localhost:8083
 export ANTHROPIC_API_KEY=anything   # or your FXC_API_KEY if you set one
 claude
@@ -74,7 +72,6 @@ Fallback chain: Kiro → OpenRouter → iFlow → NVIDIA → Groq → Gemini
 If one provider fails, rate-limits you, or your token expires, Fauxclaw automatically tries the next one. You won't even notice.
 
 Commands
-bash
 fxc setup          # Interactive provider setup (Kiro device auth, API keys)
 fxc start          # Launch the proxy (default command)
 fxc status         # Show token expiry & provider health
@@ -87,7 +84,6 @@ Configuration
 Environment Variables
 Optional – most things are stored in ~/.fauxclaw/config.json after setup.
 
-env
 FXC_PORT=8083                     # Port to listen on
 FXC_HOST=127.0.0.1                # Bind address (use 0.0.0.0 for external access)
 FXC_API_KEY=your-secret-here      # Require this in X-Proxy-Key header
