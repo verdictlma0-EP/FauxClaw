@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Runtime data
+.fauxclaw/
+*.log
+*.pid
+
+# Environment
+.env
+.env.local
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor junk
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build artifacts
+dist/
+build/
