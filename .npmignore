@@ -1,12 +1,43 @@
-# Tests, docs, local config
-tests/
-docs/
+# Local config & secrets (never ship)
 .fauxclaw/
 .env
-*.log
+.env.local
 
-# Build artifacts (if any)
+# Build artifacts (not needed for npm package)
 dist/
 *.exe
 *.deb
 *.pkg
+*.msi
+*.dmg
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tests (if you add them later)
+tests/
+coverage/
+*.test.js
+
+# Docs 
+BUILDME.md
+docs/
+
+# Development files
+.git/
+.github/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# License file (keep LICENSE, but skip others)
+!LICENSE
