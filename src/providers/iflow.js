@@ -1,5 +1,5 @@
-// iFlow – Chinese free provider with HMAC auth.
-// Token from iflow.cn. Works surprisingly well.
+// iFlow, Chinese free provider with HMAC auth
+// Token from iflow.cn. Works unsurprisingly well, since it is made in china ;P
 
 import crypto from 'crypto';
 import { nodeHttps } from '../utils/http.js';
