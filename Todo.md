@@ -3,9 +3,9 @@
 ## High Priority (Next Release)
 
 - [x] **Publish to npm** – disable 2FA temporarily, run `npm publish`, then re-enable.  
-- [ ] **Add one-line installer** – `curl -fsSL https://raw.githubusercontent.com/fauxclaw/fauxclaw/main/install.sh | sh` (and PowerShell equivalent).  
-- [ ] **Add demo GIF/screenshot** to README showing `fxc setup` → `fxc start` → Claude Code working.  
-- [ ] **Add GitHub badges** (npm version, license, Node version, build status).  
+- [x] **Add one-line installer** – `curl -fsSL https://raw.githubusercontent.com/fauxclaw/fauxclaw/main/install.sh | sh` (and PowerShell equivalent).  
+- [x] **Add demo GIF/screenshot** to README showing `fxc setup` → `fxc start` → Claude Code working.  
+- [x] **Add GitHub badges** (npm version, license, Node version, build status).  
 
 ## Medium Priority
 
