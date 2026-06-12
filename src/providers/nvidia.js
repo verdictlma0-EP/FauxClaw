@@ -1,4 +1,4 @@
-// NVIDIA NIM provider = OpenAI-compatible Chat Completions
+// NVIDIA NIM
 import { nodeHttps } from '../utils/http.js';
 import { extractText } from '../utils/helpers.js';
 
@@ -6,7 +6,7 @@ export async function nvidiaChat(apiKey, body, model) {
   // Remove 'nvidia_nim/' prefix if present
   const cleanModel = model.replace(/^nvidia_nim\//, '');
   
-  // Convert Anthropic format to OpenAI format yay
+  // Convert Anthropic format to OpenAI format
   const messages = body.messages?.map(m => ({
     role: m.role,
     content: extractText(m.content)
