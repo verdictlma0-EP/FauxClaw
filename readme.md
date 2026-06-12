@@ -190,11 +190,11 @@ claudecodeui – Session management patterns
 And a lot of staring at binary EventStream dumps at 3:42 AM CST/CDT.
 
 npm install -g fauxclaw && fxc setup && fxc start
-"Fake it till you make it, but today you made it." 🦞
+"Fake it till you make it, but today you made it." 🦞```
 
 
 <div align="center">
-  <img src="assets/fauxclaw.png" width="700">
+  <img src="assets/fauxclaw.png" alt="Fauxclaw in action" width="700">
   <br>
   <em>Fauxclaw running in PowerShell</em>
 </div>
