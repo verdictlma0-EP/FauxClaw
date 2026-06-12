@@ -80,6 +80,7 @@ text
 Permissions are set to 0600 (owner read/write only) because it contains sensitive data.
 
 How It Works
+```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │ Claude Code │────▶│  Fauxclaw   │────▶│   Kiro      │
 │             │     │   Proxy     │     │  (Free)     │
