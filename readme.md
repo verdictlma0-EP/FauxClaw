@@ -3,7 +3,7 @@
 > *Real Claude. Fake Bill.*  
 > A free AI proxy for Claude Code that scratches your AI itch without scratching your wallet.
 
-Fauxclaw routes Claude Code requests through multiple **free** providers – AWS CodeWhisperer (Kiro), OpenRouter free tier, and iFlow – with automatic failover, token refresh, and zero configuration beyond the initial setup.
+Fauxclaw routes Claude Code requests through multiple **free** providers, AWS CodeWhisperer (Kiro), OpenRouter free tier, and iFlow, with automatic failover, token refresh, and zero configuration beyond the initial setup.
 
 **No credit card. No AWS bill. Just Claude.**
 
@@ -24,7 +24,7 @@ Fauxclaw routes Claude Code requests through multiple **free** providers – AWS
 
 ## Quick Start
 
-```bash
+```
 # Clone the repo
 git clone https://github.com/fauxclaw/fauxclaw
 cd fauxclaw
@@ -54,7 +54,7 @@ Fallback chain: Kiro → OpenRouter → iFlow
 
 If one provider fails, rate-limits you, or your token expires, Fauxclaw automatically tries the next one. You won't even notice.
 
-🛠️ Commands
+Commands
 bash
 fxc setup          # Interactive provider setup (Kiro device auth, API keys)
 fxc start          # Launch the proxy (default command)
@@ -68,7 +68,7 @@ Configuration
 Environment Variables
 Optional – most things are stored in ~/.fauxclaw/config.json after setup.
 
-env
+
 FXC_PORT=8083                     # Port to listen on
 FXC_HOST=127.0.0.1                # Bind address (use 0.0.0.0 for external access)
 FXC_API_KEY=your-secret-here      # Require this in X-Proxy-Key header
@@ -79,7 +79,7 @@ FXC_MAX_BUFFER=5242880            # Max buffer size for streaming (5MB)
 Config File Location
 All tokens, OAuth secrets, and API keys are stored in:
 
-text
+
 ~/.fauxclaw/config.json
 Permissions are set to 0600 (owner read/write only) because it contains sensitive data.
 
