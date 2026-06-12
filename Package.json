@@ -1,0 +1,43 @@
+{
+  "name": "fauxclaw",
+  "version": "2.0.0",
+  "description": "🦞 Real Claude. Fake Bill. – Free AI proxy for Claude Code",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "fxc": "./bin/fxc.js",
+    "fauxclaw": "./bin/fxc.js"
+  },
+  "scripts": {
+    "start": "node bin/fxc.js start",
+    "setup": "node bin/fxc.js setup",
+    "status": "node bin/fxc.js status",
+    "metrics": "node bin/fxc.js metrics",
+    "purge": "node bin/fxc.js purge",
+    "dev": "FXC_LOG=debug node bin/fxc.js start"
+  },
+  "keywords": [
+    "claude",
+    "ai-proxy",
+    "free-ai",
+    "fauxclaw",
+    "claude-code",
+    "anthropic",
+    "kiro",
+    "openrouter",
+    "fxc"
+  ],
+  "author": "Fauxclaw Contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fauxclaw/fauxclaw"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/fauxclaw"
+  }
+}
