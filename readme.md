@@ -196,6 +196,7 @@ claudecodeui – Session management patterns
 
 And a lot of staring at binary EventStream dumps at 3:42 AM.
 
-bash
+
 npm install -g fauxclaw && fxc setup && fxc start
+
 "Fake it till you make it, but today you made it."
