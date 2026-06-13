@@ -35,7 +35,7 @@ function askQuestion() {
     const trimmed = input.trim().toLowerCase();
     
     if (trimmed === '/exit' || trimmed === '/quit') {
-      console.log('\n Goodbye \n');
+      console.log('\n Goodbye! Fake it till you make it.\n');
       rl.close();
       process.exit(0);
     }
@@ -49,7 +49,7 @@ function askQuestion() {
     
     if (trimmed === '/status') {
       const providerCount = Object.keys(config).filter(k => 
-        config[k] && (config[k].apiKey || config[k].token || config[k].accessToken)
+        config[k] && (config[k].apiKey || config[k].token || config[k].accessToken || config[k].baseUrl)
       ).length;
       
       console.log(`\n Session: ${sessionId}`);
@@ -93,6 +93,10 @@ async function sendMessage(userInput) {
   
   let fullResponse = '';
   let hasStreamed = false;
+  let buffer = '';
+  let lastChunkTime = Date.now();
+  const MAX_BUFFER_SIZE = 5 * 1024 * 1024;
+  const TIMEOUT_MS = 30000;
   
   try {
     const { response, format } = await routeRequest(config, requestBody, 'claude-sonnet-4-5', sessionId);
@@ -116,8 +120,22 @@ async function sendMessage(userInput) {
       }
     } else {
       for await (const chunk of response) {
-        const chunkStr = chunk.toString();
-        const lines = chunkStr.split('\n');
+        if (Date.now() - lastChunkTime > TIMEOUT_MS) {
+          console.log('\n Stream timeout');
+          break;
+        }
+        lastChunkTime = Date.now();
+        
+        buffer += chunk.toString();
+        
+        if (buffer.length > MAX_BUFFER_SIZE) {
+          console.log('\n Buffer limit reached, truncating');
+          buffer = buffer.slice(-MAX_BUFFER_SIZE);
+        }
+        
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
@@ -174,11 +192,11 @@ function start() {
 const hasProviders = Object.keys(config).some(k => 
   k === 'kiro' || k === 'openrouter' || k === 'iflow' || 
   k === 'nvidia' || k === 'groq' || k === 'gemini' || 
-  k === 'deepseek' || k === 'mistral'
+  k === 'deepseek' || k === 'mistral' || k === 'ollama'
 );
 
 if (!hasProviders) {
-  showError('No providers configured. Run: npx fauxclaw setup');
+  showError('No providers configured. Run: fxc setup');
   process.exit(1);
 }
 
