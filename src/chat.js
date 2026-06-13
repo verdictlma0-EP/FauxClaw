@@ -3,8 +3,7 @@
 import readline from 'readline';
 import { loadConfig } from './config.js';
 import { routeRequest } from './providers/index.js';
-import { logger } from './utils/logger.js';
-import { showBranding } from './utils/branding.js';
+import { showChatHeader, showError, showSuccess, showInfo } from './utils/branding.js';
 
 const config = loadConfig();
 
@@ -16,25 +15,58 @@ const rl = readline.createInterface({
 let conversationHistory = [];
 let sessionId = `chat_${Date.now()}`;
 
+function showHelp() {
+  console.log(`
+\x1b[33mAvailable Commands:\x1b[0m
+  /exit, /quit     Exit the chat
+  /clear           Clear conversation history
+  /status          Show session info and configured providers
+  /help            Show this help message
+
+\x1b[36mTips:\x1b[0m
+  - Just type your message and press Enter to chat
+  - The AI will stream responses in real time
+  - Conversation history is maintained until you use /clear
+`);
+}
+
 function askQuestion() {
   rl.question('\n\x1b[36mYou:\x1b[0m ', async (input) => {
-    if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') {
-      console.log('\n Goodbye\n');
+    const trimmed = input.trim().toLowerCase();
+    
+    if (trimmed === '/exit' || trimmed === '/quit') {
+      console.log('\n Goodbye \n');
       rl.close();
       process.exit(0);
     }
     
-    if (input.toLowerCase() === 'clear') {
+    if (trimmed === '/clear') {
       conversationHistory = [];
-      console.log('\n Conversation cleared.\n');
+      showSuccess('Conversation cleared.');
       askQuestion();
       return;
     }
     
-    if (input.toLowerCase() === 'status') {
+    if (trimmed === '/status') {
+      const providerCount = Object.keys(config).filter(k => 
+        config[k] && (config[k].apiKey || config[k].token || config[k].accessToken)
+      ).length;
+      
       console.log(`\n Session: ${sessionId}`);
-      console.log(` Messages: ${conversationHistory.length}`);
-      console.log(` Providers: ${Object.keys(config).filter(k => config[k] && (config[k].apiKey || config[k].token)).join(', ')}\n`);
+      console.log(` Messages in history: ${conversationHistory.length}`);
+      console.log(` Configured providers: ${providerCount}`);
+      console.log(` Proxy: http://${process.env.FXC_HOST || '127.0.0.1'}:${process.env.FXC_PORT || '8083'}\n`);
+      askQuestion();
+      return;
+    }
+    
+    if (trimmed === '/help') {
+      showHelp();
+      askQuestion();
+      return;
+    }
+    
+    if (!input.trim()) {
       askQuestion();
       return;
     }
@@ -45,7 +77,7 @@ function askQuestion() {
 }
 
 async function sendMessage(userInput) {
-  console.log('\n\x1b[32mFauxclaw:\x1b[0m ');
+  process.stdout.write('\n\x1b[32mFauxclaw:\x1b[0m ');
   
   conversationHistory.push({
     role: 'user',
@@ -66,7 +98,6 @@ async function sendMessage(userInput) {
     const { response, format } = await routeRequest(config, requestBody, 'claude-sonnet-4-5', sessionId);
     
     if (format === 'binary') {
-      // Handle Kiro binary stream
       const { streamKiroResponse } = await import('./providers/kiro.js');
       for await (const sse of streamKiroResponse(response, `msg_${Date.now()}`)) {
         const lines = sse.split('\n');
@@ -84,7 +115,6 @@ async function sendMessage(userInput) {
         }
       }
     } else {
-      // Handle SSE stream
       for await (const chunk of response) {
         const chunkStr = chunk.toString();
         const lines = chunkStr.split('\n');
@@ -125,7 +155,6 @@ async function sendMessage(userInput) {
       });
     }
     
-    // Trim history if too long
     if (conversationHistory.length > 20) {
       conversationHistory = conversationHistory.slice(-20);
     }
@@ -136,13 +165,12 @@ async function sendMessage(userInput) {
 }
 
 function start() {
-  console.log(showBranding());
-  console.log('\n\x1b[33m Commands: /exit, /clear, /status\x1b[0m\n');
-  console.log('Starting chat session...\n');
+  console.log(showChatHeader());
+  showHelp();
+  showInfo('Starting chat session...\n');
   askQuestion();
 }
 
-// Check if providers are configured
 const hasProviders = Object.keys(config).some(k => 
   k === 'kiro' || k === 'openrouter' || k === 'iflow' || 
   k === 'nvidia' || k === 'groq' || k === 'gemini' || 
@@ -150,7 +178,7 @@ const hasProviders = Object.keys(config).some(k =>
 );
 
 if (!hasProviders) {
-  console.log('\n No providers configured. Run: npx fauxclaw setup\n');
+  showError('No providers configured. Run: npx fauxclaw setup');
   process.exit(1);
 }
 
