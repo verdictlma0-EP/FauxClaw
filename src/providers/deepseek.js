@@ -26,5 +26,6 @@ export async function deepseekChat(apiKey, body, model) {
     timeout: parseInt(process.env.FXC_TIMEOUT || '30000')
   });
 
+  // DeepSeek uses Anthropic-compatible API directly, no conversion needed
   return { response, requestId: `deepseek_${Date.now()}`, format: 'sse' };
 }
