@@ -32,5 +32,6 @@ export async function mistralChat(apiKey, body, model) {
     timeout: parseInt(process.env.FXC_TIMEOUT || '30000')
   });
 
-  return { response, requestId: `mistral_${Date.now()}`, format: 'sse' };
+  // Mistral returns OpenAI-format SSE, needs conversion
+  return { response, requestId: `mistral_${Date.now()}`, format: 'openai_sse' };
 }
