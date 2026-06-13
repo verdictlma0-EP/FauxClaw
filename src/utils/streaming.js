@@ -1,5 +1,4 @@
-// Streaming helpers for Kiro's binary EventStream.
-// This file is imported by kiro.js but split out for clarity.
+// AWS EventStream frame parser for Kiro binary responses
 
 const MAX_FRAME_SIZE = parseInt(process.env.FXC_MAX_BUFFER || '5242880');
 
@@ -18,7 +17,7 @@ export function parseEventFrame(data) {
       const name = data.subarray(off, off + nameLen).toString();
       off += nameLen;
       const type = data[off++];
-      if (type === 7) { // string header
+      if (type === 7) {
         const valLen = data.readUInt16BE(off);
         off += 2;
         if (off + valLen > data.length) break;
@@ -38,6 +37,30 @@ export function parseEventFrame(data) {
     }
     return { headers, payload };
   } catch {
+    return null;
+  }
+}
+
+// Convert OpenAI-format SSE to Anthropic SSE
+export function convertOpenAIToAnthropicSSE(openaiChunk) {
+  try {
+    const data = JSON.parse(openaiChunk);
+    
+    if (data.choices && data.choices[0] && data.choices[0].delta) {
+      const delta = data.choices[0].delta;
+      const content = delta.content || '';
+      
+      if (content) {
+        return {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: content }
+        };
+      }
+    }
+    
+    return null;
+  } catch (e) {
     return null;
   }
 }
