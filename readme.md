@@ -175,13 +175,13 @@ What this means for you:
 
 Use Fauxclaw for anything – personal, commercial, internal
 
-Modify it – but share your changes to the Fauxclaw codebase
+Modify it, but share your changes to the Fauxclaw codebase
 
-Include it in proprietary software – as long as you don't modify Fauxclaw itself
+Include it in proprietary software, as long as you don't modify Fauxclaw itself
 
-Sell a service powered by Fauxclaw – no problem
+Sell a service powered by Fauxclaw, no problem
 
-Close-source your modifications to Fauxclaw – share them back
+Close-source your modifications to Fauxclaw, share them back
 
 See the full license text for details.
 
