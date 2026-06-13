@@ -1,11 +1,17 @@
 import http from 'http';
 import { URL } from 'url';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { routeRequest, getAvailableProviders } from './providers/index.js';
 import { validateApiKey, rateLimit } from './utils/security.js';
 import { logger } from './utils/logger.js';
 import { metrics, updateRequestMetrics } from './utils/metrics.js';
 import { sessionStore } from './session.js';
 import { showStartup } from './utils/branding.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const dashboardHtml = readFileSync(join(__dirname, 'dashboard.html'), 'utf8');
 
 const PORT = parseInt(process.env.FXC_PORT || '8083');
 const HOST = process.env.FXC_HOST || '127.0.0.1';
@@ -43,15 +49,15 @@ export async function startServer(config) {
 
   server.listen(PORT, HOST, () => {
     logger.info(`Fauxclaw scratching on http://${HOST}:${PORT}`);
-    if (process.env.FXC_API_KEY) logger.info('API key auth is ON, cool beans');
-    if (process.env.FXC_RATE_LIMIT) logger.info(`Rate limit, what were you thinking?: ${process.env.FXC_RATE_LIMIT}/min`);
+    if (process.env.FXC_API_KEY) logger.info('API key auth is ON');
+    if (process.env.FXC_RATE_LIMIT) logger.info(`Rate limit: ${process.env.FXC_RATE_LIMIT}/min`);
   });
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`nuh uh bum, Port ${PORT} is taken. Set FXC_PORT to something else.`);
+      console.error(`Port ${PORT} is taken. Set FXC_PORT to something else.`);
     } else {
-      console.error(`nope, how would you even get a Server error with: ${err.message}`);
+      console.error(`Server error: ${err.message}`);
     }
     process.exit(1);
   });
@@ -60,7 +66,7 @@ export async function startServer(config) {
 async function handleRequest(req, res, config, clientIp, startTime) {
   const url = new URL(req.url, `http://${HOST}`);
 
-  // CORS because Claude Code sometimes calls from a browser context and now i wasted a shit ton of time
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, anthropic-version, x-api-key, x-proxy-key, x-session-id');
@@ -78,16 +84,16 @@ async function handleRequest(req, res, config, clientIp, startTime) {
   }
   if (!rateLimit(clientIp)) {
     res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
-    res.end(JSON.stringify({ error: 'Rate limit exceeded. Slow down, claw-some.' }));
+    res.end(JSON.stringify({ error: 'Rate limit exceeded. Slow down.' }));
     return;
   }
 
-  // Health thing
+  // Health check
   if (url.pathname === '/' || url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'fauxclaw is scratching',
-      version: '2.0.0',
+      version: '2.1.0',
       providers: getAvailableProviders(config),
       uptime: process.uptime(),
       active: activeRequests
@@ -95,14 +101,21 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Metrics endpoint (if you enabled it)
+  // Web Dashboard
+  if (url.pathname === '/dashboard') {
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(dashboardHtml);
+    return;
+  }
+
+  // Metrics endpoint
   if (process.env.FXC_METRICS !== 'false' && url.pathname === '/metrics') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(metrics));
     return;
   }
 
-  // /v1/models claude calls on this during startup and what they are is kind of obvious
+  // /v1/models 
   if (url.pathname === '/v1/models') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -115,13 +128,16 @@ async function handleRequest(req, res, config, clientIp, startTime) {
         { id: 'deepseek-r1', object: 'model', owned_by: 'fauxclaw-iflow' },
         { id: 'nvidia/nemotron-3-super-120b-a12b', object: 'model', owned_by: 'fauxclaw-nvidia' },
         { id: 'groq/llama-3.3-70b-versatile', object: 'model', owned_by: 'fauxclaw-groq' },
-        { id: 'gemini/gemini-2.0-flash', object: 'model', owned_by: 'fauxclaw-gemini' }
+        { id: 'gemini/gemini-2.0-flash', object: 'model', owned_by: 'fauxclaw-gemini' },
+        { id: 'deepseek/deepseek-chat', object: 'model', owned_by: 'fauxclaw-deepseek' },
+        { id: 'mistral/mistral-small-latest', object: 'model', owned_by: 'fauxclaw-mistral' },
+        { id: 'ollama/llama3.1', object: 'model', owned_by: 'fauxclaw-ollama' }
       ]
     }));
     return;
   }
 
-  // Token counting, Claude Code sends this to estimate usage, and so learning from great Frank Abagnale, we obviously fake it.
+  // Token counting 
   if (url.pathname === '/v1/messages/count_tokens') {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -130,7 +146,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Main event: /v1/messages yay
+  // Main endpoint: /v1/messages
   if (url.pathname === '/v1/messages' && req.method === 'POST') {
     let raw = '';
     for await (const chunk of req) raw += chunk;
@@ -139,7 +155,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
       payload = JSON.parse(raw);
     } catch {
       res.writeHead(400);
-      res.end(JSON.stringify({ error: 'Invalid JSON. Check your request body.' }));
+      res.end(JSON.stringify({ error: 'Invalid JSON.' }));
       return;
     }
 
@@ -147,7 +163,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     const stream = payload.stream !== false;
     const sessionId = req.headers['x-session-id'] || null;
 
-    logger.info(`🦞 ${model} | msgs:${payload.messages?.length} | stream:${stream}`);
+    logger.info(` ${model} | msgs:${payload.messages?.length} | stream:${stream}`);
 
     try {
       const { response, requestId, format } = await routeRequest(config, payload, model, sessionId);
@@ -165,7 +181,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
-          'X-Accel-Buffering': 'no'    // disable nginx buffering because it is very annoying
+          'X-Accel-Buffering': 'no'
         });
 
         if (format === 'binary') {
@@ -173,8 +189,12 @@ async function handleRequest(req, res, config, clientIp, startTime) {
           for await (const sse of streamKiroResponse(response, requestId)) {
             res.write(sse);
           }
+        } else if (format === 'ollama') {
+          const { streamOllamaResponse } = await import('./providers/ollama.js');
+          for await (const sse of streamOllamaResponse(response)) {
+            res.write(sse);
+          }
         } else {
-          // OpenRouter or iFlow already speak SSE
           for await (const chunk of response) {
             res.write(chunk);
           }
