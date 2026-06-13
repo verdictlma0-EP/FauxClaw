@@ -1,5 +1,5 @@
-// Provider router with fallback chain.
-// Order: Kiro (free Claude) → OpenRouter → iFlow → NVIDIA → Groq → Gemini
+// Provider router with fallback chain
+// Order: Kiro (free Claude) → OpenRouter → iFlow → NVIDIA → Groq → Gemini → DeepSeek → Mistral → Ollama
 
 import { kiroChat, kiroGetToken, kiroRefreshToken } from './kiro.js';
 import { openrouterChat } from './openrouter.js';
@@ -7,8 +7,10 @@ import { iflowChat } from './iflow.js';
 import { nvidiaChat } from './nvidia.js';
 import { groqChat } from './groq.js';
 import { geminiChat } from './gemini.js';
+import { deepseekChat } from './deepseek.js';
+import { mistralChat } from './mistral.js';
+import { ollamaChat } from './ollama.js';
 import { CircuitBreaker } from '../circuitbreaker.js';
-import { loadConfig, saveConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { updateProviderMetrics } from '../utils/metrics.js';
 
@@ -18,7 +20,10 @@ const breakers = {
   iflow: new CircuitBreaker('iflow'),
   nvidia: new CircuitBreaker('nvidia'),
   groq: new CircuitBreaker('groq'),
-  gemini: new CircuitBreaker('gemini')
+  gemini: new CircuitBreaker('gemini'),
+  deepseek: new CircuitBreaker('deepseek'),
+  mistral: new CircuitBreaker('mistral'),
+  ollama: new CircuitBreaker('ollama')
 };
 
 export async function routeRequest(config, body, model, sessionId = null, retry = 0) {
@@ -35,7 +40,7 @@ export async function routeRequest(config, body, model, sessionId = null, retry 
     }
 
     try {
-      logger.info(`🦞 Trying ${provider} (attempt ${retry + 1})`);
+      logger.info(` Trying ${provider} (attempt ${retry + 1})`);
       const start = Date.now();
       let result;
 
@@ -66,6 +71,17 @@ export async function routeRequest(config, body, model, sessionId = null, retry 
         const key = config.gemini?.apiKey;
         if (!key) throw new Error('Gemini API key missing');
         result = await cb.call(() => geminiChat(key, body, model));
+      } else if (provider === 'deepseek') {
+        const key = config.deepseek?.apiKey;
+        if (!key) throw new Error('DeepSeek API key missing');
+        result = await cb.call(() => deepseekChat(key, body, model));
+      } else if (provider === 'mistral') {
+        const key = config.mistral?.apiKey;
+        if (!key) throw new Error('Mistral API key missing');
+        result = await cb.call(() => mistralChat(key, body, model));
+      } else if (provider === 'ollama') {
+        const baseUrl = config.ollama?.baseUrl || 'http://localhost:11434';
+        result = await cb.call(() => ollamaChat(baseUrl, body, model));
       } else {
         continue;
       }
@@ -96,5 +112,8 @@ export function getAvailableProviders(config) {
   if (config.nvidia?.apiKey) chain.push('nvidia');
   if (config.groq?.apiKey) chain.push('groq');
   if (config.gemini?.apiKey) chain.push('gemini');
+  if (config.deepseek?.apiKey) chain.push('deepseek');
+  if (config.mistral?.apiKey) chain.push('mistral');
+  if (config.ollama?.baseUrl) chain.push('ollama');
   return chain;
 }
