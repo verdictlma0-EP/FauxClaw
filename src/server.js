@@ -11,7 +11,12 @@ import { sessionStore } from './session.js';
 import { showStartup } from './utils/branding.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dashboardHtml = readFileSync(join(__dirname, 'dashboard.html'), 'utf8');
+let dashboardHtml = '';
+try {
+  dashboardHtml = readFileSync(join(__dirname, 'dashboard.html'), 'utf8');
+} catch (err) {
+  logger.warn('Dashboard HTML not found, dashboard endpoint disabled');
+}
 
 const PORT = parseInt(process.env.FXC_PORT || '8083');
 const HOST = process.env.FXC_HOST || '127.0.0.1';
@@ -51,6 +56,7 @@ export async function startServer(config) {
     logger.info(`Fauxclaw scratching on http://${HOST}:${PORT}`);
     if (process.env.FXC_API_KEY) logger.info('API key auth is ON');
     if (process.env.FXC_RATE_LIMIT) logger.info(`Rate limit: ${process.env.FXC_RATE_LIMIT}/min`);
+    if (dashboardHtml) logger.info(`Dashboard: http://${HOST}:${PORT}/dashboard`);
   });
 
   server.on('error', (err) => {
@@ -102,7 +108,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
   }
 
   // Web Dashboard
-  if (url.pathname === '/dashboard') {
+  if (url.pathname === '/dashboard' && dashboardHtml) {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(dashboardHtml);
     return;
@@ -115,7 +121,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // /v1/models 
+  // /v1/models - Claude Code calls this on startup
   if (url.pathname === '/v1/models') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -137,7 +143,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Token counting 
+  // Token counting - fake it
   if (url.pathname === '/v1/messages/count_tokens') {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -163,7 +169,7 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     const stream = payload.stream !== false;
     const sessionId = req.headers['x-session-id'] || null;
 
-    logger.info(` ${model} | msgs:${payload.messages?.length} | stream:${stream}`);
+    logger.info(`${model} | msgs:${payload.messages?.length} | stream:${stream}`);
 
     try {
       const { response, requestId, format } = await routeRequest(config, payload, model, sessionId);
@@ -195,8 +201,38 @@ async function handleRequest(req, res, config, clientIp, startTime) {
             res.write(sse);
           }
         } else {
+          // Proper buffer handling for SSE streaming
+          let buffer = '';
+          const MAX_BUFFER_SIZE = 5 * 1024 * 1024;
+          let lastChunkTime = Date.now();
+          const TIMEOUT_MS = 30000;
+          
           for await (const chunk of response) {
-            res.write(chunk);
+            // Check timeout
+            if (Date.now() - lastChunkTime > TIMEOUT_MS) {
+              logger.warn('Stream timeout, breaking');
+              break;
+            }
+            lastChunkTime = Date.now();
+            
+            buffer += chunk.toString();
+            
+            if (buffer.length > MAX_BUFFER_SIZE) {
+              logger.warn('Buffer exceeded 5MB, truncating');
+              buffer = buffer.slice(-MAX_BUFFER_SIZE);
+            }
+            
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+              res.write(line + '\n');
+            }
+          }
+          
+          // Write remaining buffer
+          if (buffer) {
+            res.write(buffer);
           }
         }
         res.end();
