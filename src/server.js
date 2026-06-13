@@ -195,20 +195,57 @@ async function handleRequest(req, res, config, clientIp, startTime) {
           for await (const sse of streamKiroResponse(response, requestId)) {
             res.write(sse);
           }
+          res.end();
         } else if (format === 'ollama') {
           const { streamOllamaResponse } = await import('./providers/ollama.js');
           for await (const sse of streamOllamaResponse(response)) {
             res.write(sse);
           }
-        } else {
-          // Proper buffer handling for SSE streaming
+          res.end();
+        } else if (format === 'openai_sse') {
+          const { convertOpenAIToAnthropicSSE } = await import('./utils/streaming.js');
           let buffer = '';
           const MAX_BUFFER_SIZE = 5 * 1024 * 1024;
           let lastChunkTime = Date.now();
           const TIMEOUT_MS = 30000;
           
           for await (const chunk of response) {
-            // Check timeout
+            if (Date.now() - lastChunkTime > TIMEOUT_MS) {
+              logger.warn('Stream timeout, breaking');
+              break;
+            }
+            lastChunkTime = Date.now();
+            
+            buffer += chunk.toString();
+            
+            if (buffer.length > MAX_BUFFER_SIZE) {
+              logger.warn('Buffer exceeded 5MB, truncating');
+              buffer = buffer.slice(-MAX_BUFFER_SIZE);
+            }
+            
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                if (line.includes('[DONE]')) {
+                  break;
+                }
+                const converted = convertOpenAIToAnthropicSSE(line.slice(6));
+                if (converted) {
+                  res.write(`event: content_block_delta\ndata: ${JSON.stringify(converted)}\n\n`);
+                }
+              }
+            }
+          }
+          res.end();
+        } else {
+          let buffer = '';
+          const MAX_BUFFER_SIZE = 5 * 1024 * 1024;
+          let lastChunkTime = Date.now();
+          const TIMEOUT_MS = 30000;
+          
+          for await (const chunk of response) {
             if (Date.now() - lastChunkTime > TIMEOUT_MS) {
               logger.warn('Stream timeout, breaking');
               break;
@@ -230,12 +267,11 @@ async function handleRequest(req, res, config, clientIp, startTime) {
             }
           }
           
-          // Write remaining buffer
           if (buffer) {
             res.write(buffer);
           }
+          res.end();
         }
-        res.end();
       } else {
         const data = await readStream(response);
         res.writeHead(200, { 'Content-Type': 'application/json' });
