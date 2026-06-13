@@ -10,7 +10,7 @@
 ## Medium Priority
 
 - [ ] **Improve error messages** – when provider fails, tell user exactly what went wrong (e.g., “Kiro token expired, auto-refresh failed”).  
-- [ ] **Add support for local providers** – Ollama, LM Studio, or llama.cpp (many users want offline free models).  
+- [x] **Add support for local providers** – Ollama, LM Studio, or llama.cpp (many users want offline free models).  
 - [ ] **Add `fxc logs` command** – tail the last N lines of the proxy log.  
 - [ ] **Windows installer** – wrap `fxc.exe` in a simple MSI or Inno Setup installer.  
 - [ ] **GitHub Actions** – auto-build executables on release and run basic smoke tests.  
@@ -19,15 +19,15 @@
 ## Low Priority / Nice to Have
 
 - [ ] **Discord bot integration** – let users run Fauxclaw via Discord (inspired by free‑claude‑code).  
-- [ ] **Web admin UI** – simple local web page to edit config and see metrics (maybe just a static HTML page that calls the existing API).  
+- [x] **Web admin UI** – simple local web page to edit config and see metrics (maybe just a static HTML page that calls the existing API).  
 - [ ] **Model picker support** – ensure `/v1/models` returns accurate free model lists for each provider.  
-- [ ] **Add provider: Groq free tier** – they have a generous free tier for some models.  
-- [ ] **Add provider: Google Gemini free tier** – via OpenAI‑compatible endpoint.  
+- [x] **Add provider: Groq free tier** – they have a generous free tier for some models.  
+- [x] **Add provider: Google Gemini free tier** – via OpenAI‑compatible endpoint.  
 - [ ] **Unit tests** – start with `streaming.js` and `kiro.js` frame parser.  
 - [ ] **TypeScript conversion** (optional) – many users expect TS, but low priority (keep simple).  
 
 ## Always
 
-- [ ] **Keep zero dependencies** – no new npm packages unless absolutely necessary.  
-- [ ] **Maintain Node.js 18+ compatibility** – do not use newer features without fallbacks.  
-- [ ] **Respond to issues within 48 hours** – responsiveness grows stars.  
+- [x] **Keep zero dependencies** – no new npm packages unless absolutely necessary.  
+- [x] **Maintain Node.js 18+ compatibility** – do not use newer features without fallbacks.  
+- [x] **Respond to issues within 48 hours** – responsiveness grows stars.  
