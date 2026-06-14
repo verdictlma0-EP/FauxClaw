@@ -28,7 +28,7 @@ Then point Claude Code (or any Anthropic‑compatible client) to:
 
 export ANTHROPIC_BASE_URL=http://localhost:8083
 export ANTHROPIC_API_KEY=anything
-claude
+fxc chat
 That's it. Claude Code now works for free.
 
 What You Get
