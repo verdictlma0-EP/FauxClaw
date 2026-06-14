@@ -1,6 +1,5 @@
 // Kiro (AWS CodeWhisperer) provider.
-// Reverse‑engineered from 9router and free-claude-code inset virgo/volans cat yippie emoji here.
-// It's messy but it works, just like my life.
+// Reverse-engineered from 9router and free-claude-code.
 
 import crypto from 'crypto';
 import { nodeHttps, fetchJSON } from '../utils/http.js';
@@ -64,7 +63,7 @@ export async function kiroPollToken(clientId, clientSecret, deviceCode, interval
       if (err.message.includes('slow_down')) await sleep(interval * 1000);
     }
   }
-  throw new Error('Device auth timeout – did you authorize?');
+  throw new Error('Device authentication timed out after ' + maxAttempts + ' attempts');
 }
 
 export async function kiroRefreshToken(config) {
@@ -80,7 +79,7 @@ export async function kiroRefreshToken(config) {
       if (res.refreshToken) config.kiro.refreshToken = res.refreshToken;
       config.kiro.expiresAt = Date.now() + (res.expiresIn || 3600) * 1000;
       saveConfig(config);
-      logger.info('🦞 Kiro token auto‑refreshed');
+      logger.info('Kiro token auto-refreshed');
       return res.accessToken;
     }
   } catch (err) {
@@ -142,7 +141,7 @@ export async function kiroChat(accessToken, body, model, sessionId = null) {
     'Accept': 'application/vnd.amazon.eventstream',
     'Authorization': `Bearer ${accessToken}`,
     'X-Amz-Target': 'AmazonCodeWhispererStreamingService.GenerateAssistantResponse',
-    'User-Agent': 'fauxclaw/2.0.0',
+    'User-Agent': 'fauxclaw/2.2.0',
     'Amz-Sdk-Request': 'attempt=1; max=3',
     'Amz-Sdk-Invocation-Id': crypto.randomUUID()
   };
@@ -158,9 +157,6 @@ export async function kiroChat(accessToken, body, model, sessionId = null) {
   return { response, requestId, format: 'binary' };
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 export async function* streamKiroResponse(response, requestId) {
   const stream = response.body || response;
   let buffer = Buffer.alloc(0);
@@ -192,11 +188,13 @@ export async function* streamKiroResponse(response, requestId) {
 
   for await (const chunk of stream) {
     if (Date.now() - startTime > parseInt(process.env.FXC_TIMEOUT || '30000')) {
+      logger.warn('Kiro stream timeout');
       break;
     }
 
     buffer = Buffer.concat([buffer, chunk]);
     if (buffer.length > parseInt(process.env.FXC_MAX_BUFFER || '5242880')) {
+      logger.warn('Buffer exceeded limit, truncating');
       buffer = buffer.slice(-parseInt(process.env.FXC_MAX_BUFFER || '5242880'));
     }
 
@@ -251,4 +249,8 @@ export async function* streamKiroResponse(response, requestId) {
 
 function formatSSE(event, data) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
