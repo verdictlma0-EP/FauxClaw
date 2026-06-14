@@ -157,6 +157,12 @@ export async function kiroChat(accessToken, body, model, sessionId = null) {
   return { response, requestId, format: 'binary' };
 }
 
+// Helper for SSE formatting
+function formatSSE(event, data) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+// The streaming function that was missing – exported as a generator
 export async function* streamKiroResponse(response, requestId) {
   const stream = response.body || response;
   let buffer = Buffer.alloc(0);
@@ -245,10 +251,6 @@ export async function* streamKiroResponse(response, requestId) {
     usage: { output_tokens: outputTokens }
   });
   yield formatSSE('message_stop', { type: 'message_stop' });
-}
-
-function formatSSE(event, data) {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 function sleep(ms) {
