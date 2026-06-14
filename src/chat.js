@@ -17,7 +17,7 @@ let sessionId = `chat_${Date.now()}`;
 let currentModel = 'claude-sonnet-4-5';
 let currentProvider = null;
 
-// Available models by provider
+// Available models by provider (example mapping)
 const availableModels = {
   kiro: ['claude-sonnet-4-5', 'claude-haiku-4-5'],
   openrouter: ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-opus-4', 'gpt-4o', 'deepseek-r1'],
@@ -164,6 +164,7 @@ async function sendMessage(userInput) {
     currentProvider = provider;
     
     if (format === 'binary') {
+      // Kiro binary stream
       let streamHandler;
       try {
         const kiroModule = await import('./providers/kiro.js');
@@ -174,9 +175,7 @@ async function sendMessage(userInput) {
       } catch (err) {
         console.log(`\n[Error] Could not load Kiro stream handler: ${err.message}`);
         console.log('Falling back to default handler...');
-        const data = await response.text();
-        console.log(data);
-        hasStreamed = true;
+        hasStreamed = false; // will be handled by fallback
       }
       
       if (streamHandler) {
@@ -286,9 +285,24 @@ async function sendMessage(userInput) {
       }
     }
     
+    // If no content was streamed, handle gracefully without calling .text() on a stream
     if (!hasStreamed) {
-      const data = await response.text();
-      console.log(data);
+      // For streamable formats that produced no content, just log a message
+      if (format === 'binary' || format === 'ollama' || format === 'openai_sse') {
+        console.log('\n[No response content]');
+      } else {
+        // For non-streaming responses, try to read as text
+        try {
+          const data = await response.text();
+          if (data) {
+            console.log(data);
+          } else {
+            console.log('[Empty response]');
+          }
+        } catch (e) {
+          console.log('[Error reading response]');
+        }
+      }
     } else {
       console.log('\n');
     }
