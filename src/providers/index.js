@@ -1,5 +1,5 @@
-// Provider router with fallback chain
-// Order: Kiro (free Claude) → OpenRouter → iFlow → NVIDIA → Groq → Gemini → DeepSeek → Mistral → Ollama
+// Provider router with fallback chain.
+// Order: Kiro (free Claude) -> OpenRouter -> iFlow -> NVIDIA -> Groq -> Gemini -> DeepSeek -> Mistral -> Ollama
 
 import { kiroChat, kiroGetToken, kiroRefreshToken } from './kiro.js';
 import { openrouterChat } from './openrouter.js';
@@ -40,7 +40,7 @@ export async function routeRequest(config, body, model, sessionId = null, retry 
     }
 
     try {
-      logger.info(` Trying ${provider} (attempt ${retry + 1})`);
+      logger.info(`Trying ${provider} (attempt ${retry + 1})`);
       const start = Date.now();
       let result;
 
@@ -87,7 +87,7 @@ export async function routeRequest(config, body, model, sessionId = null, retry 
       }
 
       updateProviderMetrics(provider, true, Date.now() - start);
-      return result;
+      return { ...result, provider };
     } catch (err) {
       logger.warn(`${provider} failed: ${err.message}`);
       errors.push(`${provider}: ${err.message}`);
