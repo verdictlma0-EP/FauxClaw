@@ -161,3 +161,94 @@ export async function kiroChat(accessToken, body, model, sessionId = null) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+export async function* streamKiroResponse(response, requestId) {
+  const stream = response.body || response;
+  let buffer = Buffer.alloc(0);
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const startTime = Date.now();
+
+  yield formatSSE('message_start', {
+    type: 'message_start',
+    message: {
+      id: requestId,
+      type: 'message',
+      role: 'assistant',
+      content: [],
+      model: 'claude-sonnet-4-5-20250929',
+      stop_reason: null,
+      stop_sequence: null,
+      usage: { input_tokens: 0, output_tokens: 0 }
+    }
+  });
+
+  yield formatSSE('content_block_start', {
+    type: 'content_block_start',
+    index: 0,
+    content_block: { type: 'text', text: '' }
+  });
+
+  yield formatSSE('ping', { type: 'ping' });
+
+  for await (const chunk of stream) {
+    if (Date.now() - startTime > parseInt(process.env.FXC_TIMEOUT || '30000')) {
+      break;
+    }
+
+    buffer = Buffer.concat([buffer, chunk]);
+    if (buffer.length > parseInt(process.env.FXC_MAX_BUFFER || '5242880')) {
+      buffer = buffer.slice(-parseInt(process.env.FXC_MAX_BUFFER || '5242880'));
+    }
+
+    let processed = 0;
+    while (buffer.length - processed >= 16) {
+      const view = new DataView(buffer.buffer, buffer.byteOffset + processed, buffer.length - processed);
+      const totalLength = view.getUint32(0, false);
+      if (totalLength < 16 || totalLength > parseInt(process.env.FXC_MAX_BUFFER || '5242880')) {
+        processed++;
+        continue;
+      }
+      if (buffer.length - processed < totalLength) break;
+
+      const { parseEventFrame } = await import('../utils/streaming.js');
+      const frame = parseEventFrame(buffer.slice(processed, processed + totalLength));
+      processed += totalLength;
+
+      if (!frame) continue;
+
+      const eventType = frame.headers[':event-type'] || '';
+
+      if (eventType === 'assistantResponseEvent' && frame.payload?.content) {
+        const text = frame.payload.content;
+        outputTokens += Math.ceil(text.length / 4);
+        yield formatSSE('content_block_delta', {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text }
+        });
+      }
+
+      if (eventType === 'metricsEvent') {
+        const m = frame.payload?.metricsEvent || frame.payload;
+        if (m?.inputTokens) inputTokens = m.inputTokens;
+        if (m?.outputTokens) outputTokens = m.outputTokens;
+      }
+
+      if (eventType === 'messageStopEvent') break;
+    }
+
+    if (processed > 0) buffer = buffer.slice(processed);
+  }
+
+  yield formatSSE('content_block_stop', { type: 'content_block_stop', index: 0 });
+  yield formatSSE('message_delta', {
+    type: 'message_delta',
+    delta: { stop_reason: 'end_turn', stop_sequence: null },
+    usage: { output_tokens: outputTokens }
+  });
+  yield formatSSE('message_stop', { type: 'message_stop' });
+}
+
+function formatSSE(event, data) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
