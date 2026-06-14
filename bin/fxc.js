@@ -61,13 +61,13 @@ async function main() {
     case '--help':
       console.log(`
 \x1b[35m╔══════════════════════════════════════════════════════════════╗
-║     FAUXCLAW - Real Claude. Fake Bill.                       ║
+║  FAUXCLAW - Real Claude. Fake Bill.                            ║
 ╚══════════════════════════════════════════════════════════════╝\x1b[0m
 
 \x1b[36mCOMMANDS:\x1b[0m
   \x1b[32mfxc setup\x1b[0m            Interactive provider setup
-  \x1b[32mfxc start\x1b[0m            Start proxy server (for Claude Code)
-  \x1b[32mfxc chat\x1b[0m / \x1b[32mfxc c\x1b[0m     Interactive chat terminal
+  \x1b[32mfxc chat\x1b[0m / \x1b[32mfxc c\x1b[0m     Start interactive chat (no Claude Code needed)
+  \x1b[32mfxc start\x1b[0m            Start proxy server (for Claude Code users)
   \x1b[32mfxc status\x1b[0m           Show token expiry and provider health
   \x1b[32mfxc metrics\x1b[0m          Performance dashboard
   \x1b[32mfxc doctor\x1b[0m           Diagnose system issues
@@ -75,10 +75,9 @@ async function main() {
   \x1b[32mfxc help\x1b[0m             Show this help message
 
 \x1b[36mEXAMPLES:\x1b[0m
-  \x1b[33m$ fxc setup && fxc start\x1b[0m
-  \x1b[33m$ fxc chat\x1b[0m
+  \x1b[33m$ fxc setup && fxc chat\x1b[0m
   \x1b[33m$ fxc doctor\x1b[0m
-  \x1b[33m$ fxc metrics\x1b[0m
+  \x1b[33m$ fxc status\x1b[0m
 
 \x1b[36mENVIRONMENT:\x1b[0m
   FXC_PORT            Port to listen on (default: 8083)
@@ -86,18 +85,18 @@ async function main() {
   FXC_API_KEY         API key for authentication (optional)
   FXC_LOG             Log level: debug, info, warn, error
 
-\x1b[33m"Fake it till you make it, but read the docs first." \x1b[0m
+\x1b[33m"Fake it till you make it, but read the docs first."\x1b[0m
 `);
       break;
       
     default:
-      console.log(`\n\x1b[31m❌ Unknown command: ${cmd}\x1b[0m`);
+      console.log(`\n\x1b[31mUnknown command: ${cmd}\x1b[0m`);
       console.log(`\x1b[36mTry \`fxc help\` for available commands.\x1b[0m\n`);
       process.exit(1);
   }
 }
 
 main().catch(err => {
-  console.error(`\n\x1b[31m💀 Fatal error: ${err.message}\x1b[0m\n`);
+  console.error(`\n\x1b[31mFatal error: ${err.message}\x1b[0m\n`);
   process.exit(1);
 });
