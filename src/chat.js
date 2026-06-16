@@ -285,13 +285,12 @@ async function sendMessage(userInput) {
       }
     }
     
-    // If no content was streamed, handle gracefully without calling .text() on a stream
+    // Handle case where no content was streamed
     if (!hasStreamed) {
-      // For streamable formats that produced no content, just log a message
-      if (format === 'binary' || format === 'ollama' || format === 'openai_sse') {
+      // For binary streams or streams without .text method, just log a message
+      if (typeof response.text !== 'function' || format === 'binary' || format === 'ollama' || format === 'openai_sse') {
         console.log('\n[No response content]');
       } else {
-        // For non-streaming responses, try to read as text
         try {
           const data = await response.text();
           if (data) {
