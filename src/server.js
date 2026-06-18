@@ -9,6 +9,7 @@ import { logger } from './utils/logger.js';
 import { metrics, updateRequestMetrics } from './utils/metrics.js';
 import { showStartup } from './utils/branding.js';
 import { loadConfig, saveConfig } from './config.js';
+// Correct imports:
 import { streamOpenAIAsAnthropic, convertOpenAIToAnthropicJSON } from './utils/streaming.js';
 import { streamKiroResponse } from './providers/kiro.js';
 import { streamOllamaResponse, convertOllamaToAnthropicJSON } from './providers/ollama.js';
@@ -24,7 +25,7 @@ try {
 const PORT = parseInt(process.env.FXC_PORT || '8083');
 const HOST = process.env.FXC_HOST || '127.0.0.1';
 const MAX_CONCURRENT = parseInt(process.env.FXC_MAX_CONCURRENT || '50');
-const VERSION = '2.8.1';
+const VERSION = '2.8.3'; // Update version here
 
 let activeRequests = 0;
 
