@@ -9,7 +9,9 @@ import { logger } from './utils/logger.js';
 import { metrics, updateRequestMetrics } from './utils/metrics.js';
 import { showStartup } from './utils/branding.js';
 import { loadConfig, saveConfig } from './config.js';
-import { streamOpenAIAsAnthropic, convertOpenAIToAnthropicJSON, streamKiroResponse, streamOllamaResponse, convertOllamaToAnthropicJSON } from './utils/streaming.js';
+import { streamOpenAIAsAnthropic, convertOpenAIToAnthropicJSON } from './utils/streaming.js';
+import { streamKiroResponse } from './providers/kiro.js';
+import { streamOllamaResponse, convertOllamaToAnthropicJSON } from './providers/ollama.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let dashboardHtml = '';
@@ -22,7 +24,7 @@ try {
 const PORT = parseInt(process.env.FXC_PORT || '8083');
 const HOST = process.env.FXC_HOST || '127.0.0.1';
 const MAX_CONCURRENT = parseInt(process.env.FXC_MAX_CONCURRENT || '50');
-const VERSION = '2.3.0';
+const VERSION = '2.8.0';
 
 let activeRequests = 0;
 
@@ -200,12 +202,9 @@ async function handleRequest(req, res, config, clientIp, startTime) {
       const result = await routeRequest(config, payload, model, sessionId);
       const { response, requestId, format, provider } = result;
 
-      // We now have a successful 2xx response or a thrown error (which is caught below)
-      // For non-streaming:
       if (!stream) {
         let data;
         if (format === 'openai_sse') {
-          // Convert OpenAI JSON to Anthropic JSON
           const rawJson = await response.text();
           const parsed = JSON.parse(rawJson);
           data = convertOpenAIToAnthropicJSON(parsed, model);
@@ -216,7 +215,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
         } else {
           // binary or sse (Anthropic-shaped) – just pass through
           data = await response.text();
-          // If it's JSON, parse and re-stringify to ensure shape, or just pass
           try { data = JSON.parse(data); } catch {}
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
