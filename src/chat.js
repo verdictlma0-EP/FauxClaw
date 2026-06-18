@@ -4,47 +4,57 @@ import readline from 'readline';
 import { loadConfig } from './config.js';
 import { routeRequest } from './providers/index.js';
 import { showChatHeader, showError, showInfo } from './utils/branding.js';
+import { streamOpenAIAsAnthropic, streamKiroResponse, streamOllamaResponse } from './utils/streaming.js';
 
 const config = loadConfig();
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
 
 let conversationHistory = [];
 let sessionId = `chat_${Date.now()}`;
 let currentModel = 'claude-sonnet-4-5';
 
-function askQuestion() {
-  rl.question('\n\x1b[36mYou:\x1b[0m ', async (input) => {
-    const trimmed = input.trim().toLowerCase();
-    if (trimmed === '/exit' || trimmed === '/quit') {
-      console.log('\nGoodbye!\n');
-      rl.close();
-      process.exit(0);
-    }
-    if (trimmed === '/clear') {
-      conversationHistory = [];
-      console.log('\n[Cleared]\n');
-      askQuestion();
-      return;
-    }
-    if (trimmed === '/status') {
-      console.log(`\nModel: ${currentModel}\nHistory: ${conversationHistory.length} messages\n`);
-      askQuestion();
-      return;
-    }
-    if (!input.trim()) {
-      askQuestion();
-      return;
-    }
-    await sendMessage(input);
-    askQuestion();
+export function startChat() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
   });
+
+  console.log(showChatHeader());
+  showInfo('Chat started. Type /exit to quit. Use /model <name> to switch models.\n');
+
+  const ask = () => {
+    rl.question('\n\x1b[36mYou:\x1b[0m ', async (input) => {
+      const trimmed = input.trim();
+      if (!trimmed) return ask();
+      if (trimmed === '/exit' || trimmed === '/quit') {
+        console.log('\nGoodbye!\n');
+        rl.close();
+        process.exit(0);
+      }
+      if (trimmed === '/clear') {
+        conversationHistory = [];
+        console.log('\n[Cleared]\n');
+        return ask();
+      }
+      if (trimmed === '/status') {
+        console.log(`\nModel: ${currentModel}\nHistory: ${conversationHistory.length} messages\n`);
+        return ask();
+      }
+      if (trimmed.startsWith('/model ')) {
+        const newModel = trimmed.slice(7).trim();
+        if (newModel) {
+          currentModel = newModel;
+          console.log(`\n[Switched to model: ${currentModel}]\n`);
+        }
+        return ask();
+      }
+      await sendMessage(trimmed, rl, ask);
+    });
+  };
+
+  ask();
 }
 
-async function sendMessage(userInput) {
+async function sendMessage(userInput, rl, ask) {
   process.stdout.write('\n\x1b[32mFauxclaw:\x1b[0m ');
   conversationHistory.push({ role: 'user', content: userInput });
 
@@ -52,17 +62,17 @@ async function sendMessage(userInput) {
     model: currentModel,
     messages: conversationHistory,
     stream: true,
-    max_tokens: 1024
+    max_tokens: 4096
   };
 
   try {
-    const { response, format } = await routeRequest(config, requestBody, currentModel, sessionId);
+    const result = await routeRequest(config, requestBody, currentModel, sessionId);
+    const { response, format, requestId, provider } = result;
+    let fullResponse = '';
+    let hasStreamed = false;
 
     if (format === 'binary') {
-      // Use streamKiroResponse properly
-      const { streamKiroResponse } = await import('./providers/kiro.js');
-      let hasStreamed = false;
-      for await (const sse of streamKiroResponse(response, `msg_${Date.now()}`)) {
+      for await (const sse of streamKiroResponse(response, requestId, currentModel)) {
         const lines = sse.split('\n');
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -70,63 +80,79 @@ async function sendMessage(userInput) {
               const data = JSON.parse(line.slice(6));
               if (data.delta?.text) {
                 process.stdout.write(data.delta.text);
+                fullResponse += data.delta.text;
                 hasStreamed = true;
               }
-            } catch (e) {}
+            } catch {}
           }
         }
       }
-      if (!hasStreamed) {
-        console.log('\n[No response content]');
-      } else {
-        console.log('\n');
-      }
-    } else {
-      // Standard SSE or passthrough
-      let hasStreamed = false;
-      for await (const chunk of response) {
-        const lines = chunk.toString().split('\n');
+    } else if (format === 'ollama') {
+      for await (const sse of streamOllamaResponse(response, requestId, currentModel)) {
+        const lines = sse.split('\n');
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.delta?.text) {
                 process.stdout.write(data.delta.text);
-                hasStreamed = true;
-              } else if (data.content?.[0]?.text) {
-                process.stdout.write(data.content[0].text);
+                fullResponse += data.delta.text;
                 hasStreamed = true;
               }
-            } catch (e) {}
+            } catch {}
           }
         }
       }
-      if (!hasStreamed) {
-        console.log('\n[No response content]');
-      } else {
-        console.log('\n');
+    } else if (format === 'openai_sse') {
+      for await (const sse of streamOpenAIAsAnthropic(response, requestId, currentModel)) {
+        const lines = sse.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.delta?.text) {
+                process.stdout.write(data.delta.text);
+                fullResponse += data.delta.text;
+                hasStreamed = true;
+              }
+            } catch {}
+          }
+        }
+      }
+    } else {
+      // sse (Anthropic-shaped) passthrough
+      let buffer = '';
+      for await (const chunk of response) {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.delta?.text) {
+                process.stdout.write(data.delta.text);
+                fullResponse += data.delta.text;
+                hasStreamed = true;
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+
+    if (!hasStreamed) {
+      console.log('\n[No response content]');
+    } else {
+      console.log('\n');
+      // Record assistant response for history
+      if (fullResponse) {
+        conversationHistory.push({ role: 'assistant', content: fullResponse });
       }
     }
   } catch (err) {
     console.log(`\n[Error] ${err.message}`);
+    // Remove the failed user message to avoid polluting history
+    conversationHistory.pop();
   }
 }
-
-function start() {
-  console.log(showChatHeader());
-  showInfo('Chat started. Type /exit to quit.\n');
-  askQuestion();
-}
-
-const hasProviders = Object.keys(config).some(k => 
-  k === 'kiro' || k === 'openrouter' || k === 'iflow' || 
-  k === 'nvidia' || k === 'groq' || k === 'gemini' || 
-  k === 'deepseek' || k === 'mistral' || k === 'ollama'
-);
-
-if (!hasProviders) {
-  showError('No providers configured. Run: fxc setup');
-  process.exit(1);
-}
-
-start();
