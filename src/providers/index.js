@@ -1,7 +1,8 @@
-// Provider router with fallback chain.
-// Order: Kiro (free Claude) -> OpenRouter -> iFlow -> NVIDIA -> Groq -> Gemini -> DeepSeek -> Mistral -> Ollama
+// Provider router with fallback chain and prefix-based routing.
+// If the model starts with a known prefix (e.g., "groq/"), it routes directly to that provider.
+// Otherwise, it falls back to the chain: Kiro -> OpenRouter -> iFlow -> NVIDIA -> Groq -> Gemini -> DeepSeek -> Mistral -> Ollama
 
-import { kiroChat, kiroGetToken, kiroRefreshToken } from './kiro.js';
+import { kiroChat, kiroGetToken } from './kiro.js';
 import { openrouterChat } from './openrouter.js';
 import { iflowChat } from './iflow.js';
 import { nvidiaChat } from './nvidia.js';
@@ -26,78 +27,122 @@ const breakers = {
   ollama: new CircuitBreaker('ollama')
 };
 
-export async function routeRequest(config, body, model, sessionId = null, retry = 0) {
+// Kiro pulls a fresh (possibly auto-refreshed) token out of config instead
+// of a static credential, so it can't use the generic creds.apiKey path below.
+async function callKiro(config, body, model, sessionId) {
+  const token = await kiroGetToken(config);
+  if (!token) throw new Error('Kiro token missing or refresh failed - run fxc setup');
+  return kiroChat(token, body, model, sessionId);
+}
+
+// Map of provider prefixes to their chat functions and config keys
+const providerMap = {
+  kiro: { fn: null, configKey: 'kiro', needs: ['refreshToken'] },
+  openrouter: { fn: openrouterChat, configKey: 'openrouter', needs: ['apiKey'] },
+  iflow: { fn: iflowChat, configKey: 'iflow', needs: ['token'] },
+  nvidia: { fn: nvidiaChat, configKey: 'nvidia', needs: ['apiKey'] },
+  groq: { fn: groqChat, configKey: 'groq', needs: ['apiKey'] },
+  gemini: { fn: geminiChat, configKey: 'gemini', needs: ['apiKey'] },
+  deepseek: { fn: deepseekChat, configKey: 'deepseek', needs: ['apiKey'] },
+  mistral: { fn: mistralChat, configKey: 'mistral', needs: ['apiKey'] },
+  ollama: { fn: ollamaChat, configKey: 'ollama', needs: ['baseUrl'] }
+};
+
+async function checkResponse(resultPromise) {
+  const result = await resultPromise;
+  const res = result.response;
+  if (res && res.ok === false && res.statusCode) {
+    let errText = '';
+    try {
+      for await (const chunk of res) errText += chunk;
+    } catch {
+      // best effort - some bodies aren't readable twice or at all
+    }
+    throw new Error(`HTTP ${res.statusCode}${errText ? `: ${errText.slice(0, 200)}` : ''}`);
+  }
+  return result;
+}
+
+function callProvider(provider, config, creds, body, model, sessionId) {
+  if (provider === 'kiro') return checkResponse(callKiro(config, body, model, sessionId));
+  if (provider === 'ollama') return checkResponse(ollamaChat(creds.baseUrl || 'http://localhost:11434', body, model));
+  if (provider === 'iflow') return checkResponse(iflowChat(creds.token, body, model));
+  return checkResponse(providerMap[provider].fn(creds.apiKey, body, model));
+}
+
+function pickDirectProvider(model) {
+  const prefixMatch = model.match(/^([a-zA-Z0-9_]+)\//);
+  if (!prefixMatch) return null;
+  return providerMap[prefixMatch[1]] ? prefixMatch[1] : null;
+}
+
+function checkCreds(config, provider) {
+  const providerConfig = providerMap[provider];
+  const creds = config[providerConfig.configKey];
+  if (!creds || providerConfig.needs.some(need => !creds[need])) return null;
+  return creds;
+}
+
+export async function routeRequest(config, body, model, sessionId = null) {
+  const directProvider = pickDirectProvider(model);
+
+  // A model with a recognized prefix (e.g. "groq/llama-3.3-70b") routes
+  // straight to that provider and never falls back to the chain - the
+  // user asked for it explicitly, so a silent swap would be surprising.
+  if (directProvider) {
+    const provider = directProvider;
+    const cb = breakers[provider];
+    const creds = checkCreds(config, provider);
+    if (!creds) {
+      throw new Error(`Provider "${provider}" is not configured. Run fxc setup to add credentials.`);
+    }
+    if (cb.state === 'OPEN') {
+      throw new Error(`Provider "${provider}" is temporarily unavailable (circuit breaker open)`);
+    }
+
+    try {
+      logger.info(`Direct routing to ${provider} (via model prefix)`);
+      const start = Date.now();
+      const result = await cb.call(() => callProvider(provider, config, creds, body, model, sessionId));
+      updateProviderMetrics(provider, true, Date.now() - start);
+      return { ...result, provider };
+    } catch (err) {
+      logger.error(`Direct provider ${provider} failed: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // No prefix - walk the fallback chain in priority order
   const providers = getAvailableProviders(config);
+  if (providers.length === 0) {
+    throw new Error('No providers configured. Run fxc setup first.');
+  }
   const errors = [];
-  const MAX_RETRIES = 2;
 
   for (const provider of providers) {
     const cb = breakers[provider];
     if (cb.state === 'OPEN') {
-      logger.warn(`Skipping ${provider} – circuit breaker open`);
+      logger.warn(`Skipping ${provider} - circuit breaker open`);
       errors.push(`${provider}: circuit open`);
       continue;
     }
 
+    const creds = checkCreds(config, provider);
+    if (!creds) {
+      errors.push(`${provider}: missing credentials`);
+      continue;
+    }
+
     try {
-      logger.info(`Trying ${provider} (attempt ${retry + 1})`);
+      logger.info(`Trying ${provider}`);
       const start = Date.now();
-      let result;
-
-      if (provider === 'kiro') {
-        let token = await kiroGetToken(config);
-        if (!token) {
-          token = await kiroRefreshToken(config);
-          if (!token) throw new Error('No Kiro token – run fxc setup');
-        }
-        result = await cb.call(() => kiroChat(token, body, model, sessionId));
-      } else if (provider === 'openrouter') {
-        const key = config.openrouter?.apiKey;
-        if (!key) throw new Error('OpenRouter API key missing');
-        result = await cb.call(() => openrouterChat(key, body, model));
-      } else if (provider === 'iflow') {
-        const token = config.iflow?.token;
-        if (!token) throw new Error('iFlow token missing');
-        result = await cb.call(() => iflowChat(token, body, model));
-      } else if (provider === 'nvidia') {
-        const key = config.nvidia?.apiKey;
-        if (!key) throw new Error('NVIDIA NIM API key missing');
-        result = await cb.call(() => nvidiaChat(key, body, model));
-      } else if (provider === 'groq') {
-        const key = config.groq?.apiKey;
-        if (!key) throw new Error('Groq API key missing');
-        result = await cb.call(() => groqChat(key, body, model));
-      } else if (provider === 'gemini') {
-        const key = config.gemini?.apiKey;
-        if (!key) throw new Error('Gemini API key missing');
-        result = await cb.call(() => geminiChat(key, body, model));
-      } else if (provider === 'deepseek') {
-        const key = config.deepseek?.apiKey;
-        if (!key) throw new Error('DeepSeek API key missing');
-        result = await cb.call(() => deepseekChat(key, body, model));
-      } else if (provider === 'mistral') {
-        const key = config.mistral?.apiKey;
-        if (!key) throw new Error('Mistral API key missing');
-        result = await cb.call(() => mistralChat(key, body, model));
-      } else if (provider === 'ollama') {
-        const baseUrl = config.ollama?.baseUrl || 'http://localhost:11434';
-        result = await cb.call(() => ollamaChat(baseUrl, body, model));
-      } else {
-        continue;
-      }
-
+      const result = await cb.call(() => callProvider(provider, config, creds, body, model, sessionId));
       updateProviderMetrics(provider, true, Date.now() - start);
       return { ...result, provider };
     } catch (err) {
       logger.warn(`${provider} failed: ${err.message}`);
       errors.push(`${provider}: ${err.message}`);
       updateProviderMetrics(provider, false, 0);
-      // Special handling: if Kiro token expired, refresh and retry once
-      if (provider === 'kiro' && err.message.includes('token') && retry < MAX_RETRIES) {
-        logger.info('Refreshing Kiro token and retrying...');
-        await kiroRefreshToken(config);
-        return routeRequest(config, body, model, sessionId, retry + 1);
-      }
     }
   }
 
@@ -106,7 +151,7 @@ export async function routeRequest(config, body, model, sessionId = null, retry 
 
 export function getAvailableProviders(config) {
   const chain = [];
-  if (config.kiro?.accessToken || config.kiro?.refreshToken) chain.push('kiro');
+  if (config.kiro?.refreshToken) chain.push('kiro');
   if (config.openrouter?.apiKey) chain.push('openrouter');
   if (config.iflow?.token) chain.push('iflow');
   if (config.nvidia?.apiKey) chain.push('nvidia');
