@@ -3,6 +3,7 @@
 import { startServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { showBranding, showError } from '../src/utils/branding.js';
+import { startChat } from '../src/chat.js';
 
 const cmd = process.argv[2];
 
@@ -16,33 +17,27 @@ async function main() {
       const { setupWizard } = await import('../scripts/setup.js');
       await setupWizard();
       break;
-      
     case 'status':
       const { showStatus } = await import('../src/status.js');
-      showStatus();
+      await showStatus();
       break;
-      
     case 'metrics':
       const { showMetrics } = await import('../src/utils/metrics.js');
-      showMetrics();
+      await showMetrics();
       break;
-      
     case 'doctor':
       const { runDoctor } = await import('../src/doctor.js');
       await runDoctor();
       break;
-      
     case 'purge':
       const { sessionStore } = await import('../src/session.js');
       const n = sessionStore.purge();
-      console.log(` Purged ${n} expired sessions`);
+      console.log(`🧹 Purged ${n} expired sessions`);
       break;
-      
     case 'chat':
     case 'c':
-      const { default: chat } = await import('../src/chat.js');
+      startChat();
       break;
-      
     case 'start':
     case undefined:
       const config = loadConfig();
@@ -55,7 +50,6 @@ async function main() {
       }
       await startServer(config);
       break;
-      
     case 'help':
     case '-h':
     case '--help':
@@ -66,8 +60,8 @@ async function main() {
 
 \x1b[36mCOMMANDS:\x1b[0m
   \x1b[32mfxc setup\x1b[0m            Interactive provider setup
-  \x1b[32mfxc chat\x1b[0m / \x1b[32mfxc c\x1b[0m     Start interactive chat (no Claude Code needed)
-  \x1b[32mfxc start\x1b[0m            Start proxy server (for Claude Code users)
+  \x1b[32mfxc chat\x1b[0m / \x1b[32mfxc c\x1b[0m     Start interactive chat
+  \x1b[32mfxc start\x1b[0m            Start proxy server (for Claude Code)
   \x1b[32mfxc status\x1b[0m           Show token expiry and provider health
   \x1b[32mfxc metrics\x1b[0m          Performance dashboard
   \x1b[32mfxc doctor\x1b[0m           Diagnose system issues
@@ -88,7 +82,6 @@ async function main() {
 \x1b[33m"Fake it till you make it, but read the docs first."\x1b[0m
 `);
       break;
-      
     default:
       console.log(`\n\x1b[31mUnknown command: ${cmd}\x1b[0m`);
       console.log(`\x1b[36mTry \`fxc help\` for available commands.\x1b[0m\n`);
