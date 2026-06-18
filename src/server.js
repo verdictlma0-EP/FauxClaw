@@ -24,7 +24,7 @@ try {
 const PORT = parseInt(process.env.FXC_PORT || '8083');
 const HOST = process.env.FXC_HOST || '127.0.0.1';
 const MAX_CONCURRENT = parseInt(process.env.FXC_MAX_CONCURRENT || '50');
-const VERSION = '2.8.0';
+const VERSION = '2.8.1';
 
 let activeRequests = 0;
 
@@ -107,7 +107,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Set default model
   if (url.pathname === '/setmodel' && req.method === 'POST') {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -187,7 +186,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
       return;
     }
 
-    // Use default model if generic
     const currentConfig = loadConfig();
     const defaultModel = currentConfig.defaultModel || 'claude-sonnet-4-5';
     if (!payload.model || payload.model === 'claude-sonnet-4-5-20250929' || payload.model === 'claude-sonnet-4-5') {
@@ -213,7 +211,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
           const parsed = JSON.parse(rawJson);
           data = convertOllamaToAnthropicJSON(parsed, model);
         } else {
-          // binary or sse (Anthropic-shaped) – just pass through
           data = await response.text();
           try { data = JSON.parse(data); } catch {}
         }
@@ -222,7 +219,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
         return;
       }
 
-      // Streaming
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -243,7 +239,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
           res.write(sse);
         }
       } else {
-        // sse (already Anthropic-shaped) – passthrough
         for await (const chunk of response) {
           res.write(chunk);
         }
