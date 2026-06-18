@@ -1,5 +1,3 @@
-// Simple in‑memory metrics. Restarting the server resets them, really cool
-
 export const metrics = {
   totalRequests: 0,
   successfulRequests: 0,
@@ -9,7 +7,13 @@ export const metrics = {
   providerStats: {
     kiro: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
     openrouter: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
-    iflow: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 }
+    iflow: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
+    nvidia: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
+    groq: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
+    gemini: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
+    deepseek: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
+    mistral: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 },
+    ollama: { attempts: 0, successes: 0, failures: 0, avgLatency: 0 }
   },
   startTime: Date.now()
 };
@@ -38,14 +42,24 @@ export function updateProviderMetrics(provider, success, latency) {
   }
 }
 
-export function showMetrics() {
-  const uptime = Math.floor((Date.now() - metrics.startTime) / 1000);
-  console.log('\n FAUXCLAW METRICS');
-  console.log(`Requests: ${metrics.totalRequests} (ok: ${metrics.successfulRequests}, fail: ${metrics.failedRequests})`);
-  console.log(`Avg latency: ${metrics.avgLatency.toFixed(0)}ms`);
-  console.log(`Uptime: ${uptime}s`);
-  console.log('\nProvider breakdown:');
-  for (const [name, s] of Object.entries(metrics.providerStats)) {
-    console.log(`  ${name}: attempts=${s.attempts} ✅=${s.successes} ❌=${s.failures} avg=${s.avgLatency.toFixed(0)}ms`);
+export async function showMetrics() {
+  // Query the running server's /metrics endpoint
+  const port = process.env.FXC_PORT || '8083';
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/metrics`);
+    if (!res.ok) throw new Error('Server not responding');
+    const data = await res.json();
+    console.log('\n📊 FAUXCLAW METRICS');
+    console.log(`Requests: ${data.totalRequests} (ok: ${data.successfulRequests}, fail: ${data.failedRequests})`);
+    console.log(`Avg latency: ${data.avgLatency.toFixed(0)}ms`);
+    const uptime = Math.floor((Date.now() - (data.startTime || Date.now())) / 1000);
+    console.log(`Uptime: ${uptime}s`);
+    console.log('\nProvider breakdown:');
+    for (const [name, s] of Object.entries(data.providerStats || {})) {
+      console.log(`  ${name}: attempts=${s.attempts} ✅=${s.successes} ❌=${s.failures} avg=${s.avgLatency.toFixed(0)}ms`);
+    }
+  } catch (err) {
+    console.log('\n❌ Cannot fetch metrics. Is the server running?');
+    console.log(`   Start with: fxc start\n`);
   }
 }
