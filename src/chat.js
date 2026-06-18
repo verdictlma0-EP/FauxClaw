@@ -4,7 +4,10 @@ import readline from 'readline';
 import { loadConfig } from './config.js';
 import { routeRequest } from './providers/index.js';
 import { showChatHeader, showError, showInfo } from './utils/branding.js';
-import { streamOpenAIAsAnthropic, streamKiroResponse, streamOllamaResponse } from './utils/streaming.js';
+// Correct imports:
+import { streamOpenAIAsAnthropic } from './utils/streaming.js';
+import { streamKiroResponse } from './providers/kiro.js';
+import { streamOllamaResponse } from './providers/ollama.js';
 
 const config = loadConfig();
 
@@ -145,14 +148,12 @@ async function sendMessage(userInput, rl, ask) {
       console.log('\n[No response content]');
     } else {
       console.log('\n');
-      // Record assistant response for history
       if (fullResponse) {
         conversationHistory.push({ role: 'assistant', content: fullResponse });
       }
     }
   } catch (err) {
     console.log(`\n[Error] ${err.message}`);
-    // Remove the failed user message to avoid polluting history
     conversationHistory.pop();
   }
 }
