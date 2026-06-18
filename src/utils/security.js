@@ -1,5 +1,4 @@
-// API key validation & rate limiting.
-// Very simple = very good
+import crypto from 'crypto';
 
 const API_KEY = process.env.FXC_API_KEY;
 const RATE_LIMIT = parseInt(process.env.FXC_RATE_LIMIT || '100');
@@ -7,10 +6,17 @@ const WINDOW_MS = 60000;
 
 const rateStore = new Map();
 
+// Constant-time compare
+function safeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
 export function validateApiKey(req) {
   if (!API_KEY) return true;
   const provided = req.headers['x-proxy-key'] || req.headers['authorization']?.replace(/^Bearer /i, '');
-  return provided === API_KEY;
+  if (!provided) return false;
+  return safeCompare(provided, API_KEY);
 }
 
 export function rateLimit(clientId) {
@@ -25,10 +31,10 @@ export function rateLimit(clientId) {
   return record.count <= RATE_LIMIT;
 }
 
-// Optional: cleanup rate store every minute to avoid memory leaks ;O
+// Cleanup interval (unref so it doesn't block process exit)
 setInterval(() => {
   const now = Date.now();
   for (const [id, rec] of rateStore.entries()) {
     if (now > rec.resetTime) rateStore.delete(id);
   }
-}, 60000);
+}, 60000).unref();
