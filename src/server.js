@@ -7,8 +7,9 @@ import { routeRequest, getAvailableProviders } from './providers/index.js';
 import { validateApiKey, rateLimit } from './utils/security.js';
 import { logger } from './utils/logger.js';
 import { metrics, updateRequestMetrics } from './utils/metrics.js';
-import { sessionStore } from './session.js';
 import { showStartup } from './utils/branding.js';
+import { loadConfig, saveConfig } from './config.js';
+import { streamOpenAIAsAnthropic, convertOpenAIToAnthropicJSON, streamKiroResponse, streamOllamaResponse, convertOllamaToAnthropicJSON } from './utils/streaming.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let dashboardHtml = '';
@@ -21,6 +22,7 @@ try {
 const PORT = parseInt(process.env.FXC_PORT || '8083');
 const HOST = process.env.FXC_HOST || '127.0.0.1';
 const MAX_CONCURRENT = parseInt(process.env.FXC_MAX_CONCURRENT || '50');
+const VERSION = '2.3.0';
 
 let activeRequests = 0;
 
@@ -28,7 +30,6 @@ export async function startServer(config) {
   console.log(showStartup(PORT, HOST, getAvailableProviders(config)));
 
   const server = http.createServer(async (req, res) => {
-    // Basic overload protection
     if (activeRequests >= MAX_CONCURRENT) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Fauxclaw is busy scratching', retry_after: 5 }));
@@ -72,7 +73,6 @@ export async function startServer(config) {
 async function handleRequest(req, res, config, clientIp, startTime) {
   const url = new URL(req.url, `http://${HOST}`);
 
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, anthropic-version, x-api-key, x-proxy-key, x-session-id');
@@ -82,7 +82,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Security
   if (!validateApiKey(req)) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized', message: 'Invalid or missing API key' }));
@@ -94,12 +93,11 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Health check
   if (url.pathname === '/' || url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'fauxclaw is scratching',
-      version: '2.1.0',
+      version: VERSION,
       providers: getAvailableProviders(config),
       uptime: process.uptime(),
       active: activeRequests
@@ -107,21 +105,45 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Web Dashboard
+  // Set default model
+  if (url.pathname === '/setmodel' && req.method === 'POST') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const { model } = JSON.parse(body);
+      if (!model) throw new Error('Model is required');
+      const currentConfig = loadConfig();
+      currentConfig.defaultModel = model;
+      saveConfig(currentConfig);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: `Default model set to ${model}` }));
+    } catch (err) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/getmodel' && req.method === 'GET') {
+    const currentConfig = loadConfig();
+    const model = currentConfig.defaultModel || 'claude-sonnet-4-5';
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ model }));
+    return;
+  }
+
   if (url.pathname === '/dashboard' && dashboardHtml) {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(dashboardHtml);
     return;
   }
 
-  // Metrics endpoint
   if (process.env.FXC_METRICS !== 'false' && url.pathname === '/metrics') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(metrics));
     return;
   }
 
-  // /v1/models - Claude Code calls this on startup
   if (url.pathname === '/v1/models') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -143,7 +165,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Token counting - fake it
   if (url.pathname === '/v1/messages/count_tokens') {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -152,7 +173,6 @@ async function handleRequest(req, res, config, clientIp, startTime) {
     return;
   }
 
-  // Main endpoint: /v1/messages
   if (url.pathname === '/v1/messages' && req.method === 'POST') {
     let raw = '';
     for await (const chunk of req) raw += chunk;
@@ -165,118 +185,72 @@ async function handleRequest(req, res, config, clientIp, startTime) {
       return;
     }
 
-    const model = payload.model || 'claude-sonnet-4-5-20250929';
+    // Use default model if generic
+    const currentConfig = loadConfig();
+    const defaultModel = currentConfig.defaultModel || 'claude-sonnet-4-5';
+    if (!payload.model || payload.model === 'claude-sonnet-4-5-20250929' || payload.model === 'claude-sonnet-4-5') {
+      payload.model = defaultModel;
+    }
+
+    const model = payload.model;
     const stream = payload.stream !== false;
     const sessionId = req.headers['x-session-id'] || null;
 
-    logger.info(`${model} | msgs:${payload.messages?.length} | stream:${stream}`);
-
     try {
-      const { response, requestId, format } = await routeRequest(config, payload, model, sessionId);
+      const result = await routeRequest(config, payload, model, sessionId);
+      const { response, requestId, format, provider } = result;
 
-      if (!response.ok && response.statusCode) {
-        const errText = await readStream(response);
-        logger.error(`Upstream ${response.statusCode}: ${errText.slice(0, 200)}`);
-        res.writeHead(response.statusCode, { 'Content-Type': 'application/json' });
-        res.end(errText);
+      // We now have a successful 2xx response or a thrown error (which is caught below)
+      // For non-streaming:
+      if (!stream) {
+        let data;
+        if (format === 'openai_sse') {
+          // Convert OpenAI JSON to Anthropic JSON
+          const rawJson = await response.text();
+          const parsed = JSON.parse(rawJson);
+          data = convertOpenAIToAnthropicJSON(parsed, model);
+        } else if (format === 'ollama') {
+          const rawJson = await response.text();
+          const parsed = JSON.parse(rawJson);
+          data = convertOllamaToAnthropicJSON(parsed, model);
+        } else {
+          // binary or sse (Anthropic-shaped) – just pass through
+          data = await response.text();
+          // If it's JSON, parse and re-stringify to ensure shape, or just pass
+          try { data = JSON.parse(data); } catch {}
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
         return;
       }
 
-      if (stream) {
-        res.writeHead(200, {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-          'X-Accel-Buffering': 'no'
-        });
+      // Streaming
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no'
+      });
 
-        if (format === 'binary') {
-          const { streamKiroResponse } = await import('./providers/kiro.js');
-          for await (const sse of streamKiroResponse(response, requestId)) {
-            res.write(sse);
-          }
-          res.end();
-        } else if (format === 'ollama') {
-          const { streamOllamaResponse } = await import('./providers/ollama.js');
-          for await (const sse of streamOllamaResponse(response)) {
-            res.write(sse);
-          }
-          res.end();
-        } else if (format === 'openai_sse') {
-          const { convertOpenAIToAnthropicSSE } = await import('./utils/streaming.js');
-          let buffer = '';
-          const MAX_BUFFER_SIZE = 5 * 1024 * 1024;
-          let lastChunkTime = Date.now();
-          const TIMEOUT_MS = 30000;
-          
-          for await (const chunk of response) {
-            if (Date.now() - lastChunkTime > TIMEOUT_MS) {
-              logger.warn('Stream timeout, breaking');
-              break;
-            }
-            lastChunkTime = Date.now();
-            
-            buffer += chunk.toString();
-            
-            if (buffer.length > MAX_BUFFER_SIZE) {
-              logger.warn('Buffer exceeded 5MB, truncating');
-              buffer = buffer.slice(-MAX_BUFFER_SIZE);
-            }
-            
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                if (line.includes('[DONE]')) {
-                  break;
-                }
-                const converted = convertOpenAIToAnthropicSSE(line.slice(6));
-                if (converted) {
-                  res.write(`event: content_block_delta\ndata: ${JSON.stringify(converted)}\n\n`);
-                }
-              }
-            }
-          }
-          res.end();
-        } else {
-          let buffer = '';
-          const MAX_BUFFER_SIZE = 5 * 1024 * 1024;
-          let lastChunkTime = Date.now();
-          const TIMEOUT_MS = 30000;
-          
-          for await (const chunk of response) {
-            if (Date.now() - lastChunkTime > TIMEOUT_MS) {
-              logger.warn('Stream timeout, breaking');
-              break;
-            }
-            lastChunkTime = Date.now();
-            
-            buffer += chunk.toString();
-            
-            if (buffer.length > MAX_BUFFER_SIZE) {
-              logger.warn('Buffer exceeded 5MB, truncating');
-              buffer = buffer.slice(-MAX_BUFFER_SIZE);
-            }
-            
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            
-            for (const line of lines) {
-              res.write(line + '\n');
-            }
-          }
-          
-          if (buffer) {
-            res.write(buffer);
-          }
-          res.end();
+      if (format === 'binary') {
+        for await (const sse of streamKiroResponse(response, requestId, model)) {
+          res.write(sse);
+        }
+      } else if (format === 'ollama') {
+        for await (const sse of streamOllamaResponse(response, requestId, model)) {
+          res.write(sse);
+        }
+      } else if (format === 'openai_sse') {
+        for await (const sse of streamOpenAIAsAnthropic(response, requestId, model)) {
+          res.write(sse);
         }
       } else {
-        const data = await readStream(response);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(data);
+        // sse (already Anthropic-shaped) – passthrough
+        for await (const chunk of response) {
+          res.write(chunk);
+        }
       }
+      res.end();
     } catch (err) {
       logger.error('Routing error:', err.message);
       res.writeHead(502);
@@ -290,10 +264,4 @@ async function handleRequest(req, res, config, clientIp, startTime) {
 
   res.writeHead(404);
   res.end('Not found. Fauxclaw only speaks /v1/messages');
-}
-
-async function readStream(stream) {
-  let data = '';
-  for await (const chunk of stream) data += chunk;
-  return data;
 }
