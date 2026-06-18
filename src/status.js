@@ -1,46 +1,47 @@
-// Shows current provider status, token expiry, etc.
-
 import { loadConfig } from './config.js';
 import { getAvailableProviders } from './providers/index.js';
 import { showStatusReport } from './utils/branding.js';
 
-export function showStatus() {
+export async function showStatus() {
   const config = loadConfig();
   const providers = getAvailableProviders(config);
 
-  const providerStatus = {};
+  // Build provider status objects
+  const statusMap = {
+    kiro: { name: 'Kiro', key: 'refreshToken' },
+    openrouter: { name: 'OpenRouter', key: 'apiKey' },
+    iflow: { name: 'iFlow', key: 'token' },
+    nvidia: { name: 'NVIDIA NIM', key: 'apiKey' },
+    groq: { name: 'Groq', key: 'apiKey' },
+    gemini: { name: 'Gemini', key: 'apiKey' },
+    deepseek: { name: 'DeepSeek', key: 'apiKey' },
+    mistral: { name: 'Mistral', key: 'apiKey' },
+    ollama: { name: 'Ollama', key: 'baseUrl' }
+  };
 
-  // Kiro
-  if (config.kiro) {
-    const expired = config.kiro.expiresAt && Date.now() > config.kiro.expiresAt;
-    providerStatus.kiro = {
-      active: !expired && !!config.kiro.accessToken,
-      configured: true,
-      message: expired ? 'expired (will auto‑refresh)' : `valid until ${new Date(config.kiro.expiresAt).toLocaleTimeString()}`
+  const providerStatus = {};
+  for (const [id, info] of Object.entries(statusMap)) {
+    const creds = config[id];
+    const hasCreds = creds && creds[info.key];
+    providerStatus[id] = {
+      name: info.name,
+      configured: !!hasCreds,
+      active: hasCreds // we consider it "active" if credentials exist; full health check done by doctor
     };
-  } else {
-    providerStatus.kiro = { active: false, configured: false, message: 'not configured' };
   }
 
-  // OpenRouter
-  providerStatus.openrouter = {
-    active: !!config.openrouter?.apiKey,
-    configured: !!config.openrouter?.apiKey,
-    message: config.openrouter?.apiKey ? 'api key set' : 'not configured'
-  };
+  // Query live metrics from the running server
+  let stats = { totalRequests: 0, successRate: '0%', avgLatency: '0ms' };
+  try {
+    const res = await fetch(`http://127.0.0.1:${process.env.FXC_PORT || 8083}/metrics`);
+    if (res.ok) {
+      const data = await res.json();
+      stats.totalRequests = data.totalRequests || 0;
+      const successRate = data.totalRequests ? ((data.successfulRequests / data.totalRequests) * 100).toFixed(1) : 0;
+      stats.successRate = successRate + '%';
+      stats.avgLatency = (data.avgLatency || 0).toFixed(0) + 'ms';
+    }
+  } catch {}
 
-  // iFlow
-  providerStatus.iflow = {
-    active: !!config.iflow?.token,
-    configured: !!config.iflow?.token,
-    message: config.iflow?.token ? 'token set' : 'not configured'
-  };
-
-  const stats = {
-    totalRequests: 0,    // we don't persist metrics, so just show 0
-    successRate: 0,
-    avgLatency: 0
-  };
-
-  showStatusReport(providerStatus, providers, stats);
+  console.log(showStatusReport(providerStatus, providers, stats));
 }
