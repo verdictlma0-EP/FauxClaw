@@ -1,11 +1,15 @@
-// Random helpers that didn't fit anywhere else.
-
 export function extractText(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content.map(c => {
       if (c.type === 'text') return c.text;
       if (c.type === 'image') return '[Image]';
+      if (c.type === 'tool_use') {
+        return `[Tool: ${c.name} (id: ${c.id})]`;
+      }
+      if (c.type === 'tool_result') {
+        return `[Tool result: ${c.content}]`;
+      }
       return '';
     }).join('\n');
   }
