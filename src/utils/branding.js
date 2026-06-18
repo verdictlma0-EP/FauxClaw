@@ -4,8 +4,9 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
-const VERSION = pkg.version || '2.3.0';
+// Correct path: from src/utils to root package.json
+const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf8'));
+const VERSION = pkg.version || '2.8.3';
 
 const logo = `
 ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -65,7 +66,7 @@ export function showChatHeader() {
 
 export function showStatusReport(providerStatus, chain, stats) {
   let output = '\n╔═══════════════════════════════════════════════════╗\n';
-  output += '║     FAUXCLAW STATUS REPORT                       ║\n';
+  output += '║  🦞  FAUXCLAW STATUS REPORT                       ║\n';
   output += '╚═══════════════════════════════════════════════════╝\n\n';
   output += 'PROVIDERS\n─────────────────────────────────────────────────────\n';
   for (const [id, info] of Object.entries(providerStatus)) {
