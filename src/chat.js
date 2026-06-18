@@ -1,10 +1,9 @@
-#!/usr/bin/env node
+=#!/usr/bin/env node
 
 import readline from 'readline';
 import { loadConfig } from './config.js';
 import { routeRequest } from './providers/index.js';
 import { showChatHeader, showError, showInfo } from './utils/branding.js';
-// Correct imports:
 import { streamOpenAIAsAnthropic } from './utils/streaming.js';
 import { streamKiroResponse } from './providers/kiro.js';
 import { streamOllamaResponse } from './providers/ollama.js';
@@ -13,7 +12,7 @@ const config = loadConfig();
 
 let conversationHistory = [];
 let sessionId = `chat_${Date.now()}`;
-let currentModel = 'claude-sonnet-4-5';
+let currentModel = 'gpt-4o';  // changed default to a working OpenRouter free model
 
 export function startChat() {
   const rl = readline.createInterface({
