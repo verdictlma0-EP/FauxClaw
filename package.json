@@ -1,6 +1,6 @@
 {
   "name": "fauxclaw",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "description": "FAUXCLAW - Real Claude. Fake Bill. Free AI proxy for Claude Code",
   "main": "index.js",
   "type": "module",
@@ -14,7 +14,8 @@
     "status": "node bin/fxc.js status",
     "metrics": "node bin/fxc.js metrics",
     "doctor": "node bin/fxc.js doctor",
-    "chat": "node bin/fxc.js chat"
+    "chat": "node bin/fxc.js chat",
+    "purge": "node bin/fxc.js purge"
   },
   "keywords": [
     "claude",
